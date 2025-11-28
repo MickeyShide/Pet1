@@ -1,0 +1,17 @@
+FROM python:3.13-slim
+
+WORKDIR /var/www
+
+ENV PYTHONPATH=/var/www
+
+RUN python -m pip install --upgrade pip wheel setuptools
+
+COPY requirements.txt requirements.txt
+
+RUN pip install -r requirements.txt --root-user-action=ignore
+
+COPY . .
+
+EXPOSE 4000
+
+ENTRYPOINT ["python", "app/main.py"]
