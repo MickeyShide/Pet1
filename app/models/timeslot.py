@@ -1,8 +1,9 @@
 from datetime import datetime
 from enum import Enum
-from sqlalchemy import Enum as SAEnum, CheckConstraint, UniqueConstraint, Index, func, text
+
+from sqlalchemy import Enum as SAEnum, CheckConstraint, UniqueConstraint, text
 from sqlalchemy import TIMESTAMP, DECIMAL
-from sqlalchemy.dialects.postgresql import TSTZRANGE, ExcludeConstraint
+from sqlalchemy.dialects.postgresql import ExcludeConstraint
 from sqlmodel import Field
 
 from .base import BaseSQLModel

@@ -28,11 +28,13 @@ async def get_token_data(jwt_token: HTTPBearerDepends) -> SAccessToken:
     except (TypeError, ValueError):
         raise UnauthorizedException("Invalid access token subject")
 
+
 async def get_admin_token_data(token: SAccessToken = Depends(get_token_data)) -> SAccessToken:
     if token.admin:
         return token
     else:
         raise ForbiddenException("Not allowed")
+
 
 UserDepends = Annotated[SAccessToken, Depends(get_token_data)]
 

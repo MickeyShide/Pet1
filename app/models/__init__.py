@@ -1,14 +1,12 @@
 from app.models.base import BaseSQLModel
-
 from .booking import Booking
-from .timeslot import TimeSlot
-from .room import Room
-from .user import User
+from .location import Location
 from .notificationlog import NotificationLog
 from .payment import Payment
-from .location import Location
+from .room import Room
+from .timeslot import TimeSlot
+from .user import User
 
-from sqlmodel import SQLModel
 __all__ = [
     "BaseSQLModel"
 ]

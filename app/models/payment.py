@@ -1,7 +1,7 @@
 from enum import Enum
 
-from sqlalchemy import UniqueConstraint
 from sqlalchemy import Enum as SAEnum
+from sqlalchemy import UniqueConstraint
 from sqlmodel import Field
 
 from .base import BaseSQLModel

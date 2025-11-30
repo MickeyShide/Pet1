@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.auth import SAccessToken
 from app.services.base import BaseService
-from app.utils.err.base.forbidden import ForbiddenException
 
 T = TypeVar("T")
 

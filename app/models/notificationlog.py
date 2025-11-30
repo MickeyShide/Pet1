@@ -1,4 +1,5 @@
 from enum import Enum
+
 from sqlalchemy import Enum as SAEnum, JSON
 from sqlmodel import Field
 

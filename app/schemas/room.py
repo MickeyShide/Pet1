@@ -17,6 +17,7 @@ class SRoomCreate(SRoomBase):
     location_id: int
     pass
 
+
 class SRoomUpdate(BaseSchema):
     name: str | None = None
     capacity: int | None = None

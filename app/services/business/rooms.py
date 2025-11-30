@@ -31,4 +31,3 @@ class RoomBusinessService(BaseBusinessService):
     @new_session()
     async def delete_by_id(self, room_id: int) -> None:
         await self.room_service.delete_by_id(room_id)
-

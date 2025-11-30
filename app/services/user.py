@@ -42,6 +42,3 @@ class UserService(BaseService[User]):
             return user
         else:
             raise UnauthorizedException("Wrong password")
-
-
-

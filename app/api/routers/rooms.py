@@ -3,7 +3,6 @@ from starlette import status
 
 from app.api.deps import AdminDepends
 from app.schemas.room import SRoomOut, SRoomUpdate
-from app.services.business.locations import LocationBusinessService
 from app.services.business.rooms import RoomBusinessService
 
 router = APIRouter(prefix="/rooms", tags=["Rooms"])

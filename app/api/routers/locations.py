@@ -75,4 +75,3 @@ async def get_all_rooms_by_location_id_route(location_id: int) -> List[SRoomOut]
 )
 async def create_room_route(location_id: int, room_data: SRoomCreate, token_data: AdminDepends) -> SRoomOut:
     return await RoomBusinessService().create_by_location_id(location_id, room_data)
-
