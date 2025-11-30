@@ -15,10 +15,8 @@ class BaseBusinessService:
     session: AsyncSession | None = None
     token_data: SAccessToken | None = None
 
-    def __init__(self, token_data: SAccessToken | None = None, admin_required: bool = False):
+    def __init__(self, token_data: SAccessToken | None = None):
         self.token_data = token_data
-        if admin_required and not self.token_data.admin:
-            raise ForbiddenException("Admin required")
 
     def __getattr__(self, name: str) -> Any:  # noqa: D401
         hints = get_type_hints(self.__class__)

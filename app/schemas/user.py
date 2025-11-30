@@ -1,9 +1,10 @@
-from pydantic import EmailStr, BaseModel
+from pydantic import EmailStr
 
 from app.models.user import UserRole
+from app.schemas import BaseSchema
 
 
-class SUserBase(BaseModel):
+class SUserBase(BaseSchema):
     first_name: str | None = None
     second_name: str | None = None
     email: EmailStr
