@@ -4,8 +4,9 @@ from typing import TypeVar, get_type_hints, Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.schemas.business.auth import SAccessToken
+from app.schemas.auth import SAccessToken
 from app.services.base import BaseService
+from app.utils.err.base.forbidden import ForbiddenException
 
 T = TypeVar("T")
 
@@ -14,8 +15,10 @@ class BaseBusinessService:
     session: AsyncSession | None = None
     token_data: SAccessToken | None = None
 
-    def __init__(self, token_data: SAccessToken | None = None):
+    def __init__(self, token_data: SAccessToken | None = None, admin_required: bool = False):
         self.token_data = token_data
+        if admin_required and not self.token_data.admin:
+            raise ForbiddenException("Admin required")
 
     def __getattr__(self, name: str) -> Any:  # noqa: D401
         hints = get_type_hints(self.__class__)

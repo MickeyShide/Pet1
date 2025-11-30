@@ -6,7 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt, JWTError
 
 from app.config import settings
-from app.schemas.business.auth import SAccessToken
+from app.schemas.auth import SAccessToken
 from app.utils.err.base.unauthorized import UnauthorizedException
 
 HTTPBearerDepends = Annotated[HTTPAuthorizationCredentials, Depends(HTTPBearer())]

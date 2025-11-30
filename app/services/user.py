@@ -1,15 +1,14 @@
 from sqlalchemy.exc import IntegrityError
-from starlette import status
 
 from app.models import User
 from app.models.user import UserRole
 from app.repositories.user import UserRepository
-from app.schemas.business.auth import SRegister, SLogin
-from app.schemas.user import SUserOut
+from app.schemas.auth import SRegister, SLogin
 from app.services.base import BaseService
 from app.utils.err.auth import EmailAlreadyTaken, UsernameAlreadyTaken
 from app.utils.err.base.unauthorized import UnauthorizedException
-from app.utils.security import hash_password, verify_password, create_access_token
+from app.utils.security import hash_password, verify_password
+
 
 class UserService(BaseService[User]):
     _repository = UserRepository

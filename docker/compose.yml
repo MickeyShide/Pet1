@@ -5,7 +5,7 @@ services:
     image: postgres:16-alpine
     container_name: fastapi_pet1-db-local
     ports:
-      - "5432:5432"
+      - "5434:5432"
     environment:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
@@ -19,7 +19,7 @@ services:
     image: redis:7-alpine
     container_name: fastapi_pet1-redis-local
     ports:
-      - "6379:6379"
+      - "6380:6379"
     networks:
       - local-net
 
@@ -30,8 +30,12 @@ services:
     container_name: fastapi_pet1-backend-local
     environment:
       DATABASE_URL: postgresql+asyncpg://app:app@db/fastapi_pet_1
+      SECRET_KEY: secret
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 15
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
     ports:
-      - "4000:4000"
+      - "4004:4000"
     depends_on:
       - db
       - redis

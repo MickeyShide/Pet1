@@ -6,7 +6,7 @@ from app.config import settings
 from app.db.base import new_session
 from app.models import User
 from app.models.user import UserRole
-from app.schemas.business.auth import SRegister, SLogin, STokenOut, SAccessToken, SRefreshToken
+from app.schemas.auth import SRegister, SLogin, STokenOut, SAccessToken, SRefreshToken
 from app.schemas.user import SUserOut
 from app.services.business.base import BaseBusinessService
 from app.services.user import UserService
