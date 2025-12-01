@@ -13,7 +13,7 @@ class SBookingBase(BaseSchema):
     total_price: Decimal
     paid_at: datetime | None
     canceled_at: datetime | None
-    expired_at: datetime
+    expires_at: datetime
 
 
 class SBookingOut(SBookingBase):

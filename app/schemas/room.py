@@ -6,16 +6,18 @@ class SRoomBase(BaseSchema):
     capacity: int
     description: str
     is_active: bool
+    location_id: int
 
 
 class SRoomOut(SRoomBase):
     id: int
-    location_id: int
 
 
-class SRoomCreate(SRoomBase):
-    location_id: int
-    pass
+class SRoomCreate(BaseSchema):
+    name: str
+    capacity: int
+    description: str
+    is_active: bool
 
 
 class SRoomUpdate(BaseSchema):

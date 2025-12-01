@@ -13,9 +13,14 @@ T = TypeVar("T")
 class BaseBusinessService:
     session: AsyncSession | None = None
     token_data: SAccessToken | None = None
+    user_id: int | None = None
+    admin: bool | None = None
 
     def __init__(self, token_data: SAccessToken | None = None):
         self.token_data = token_data
+        if self.token_data is not None:
+            self.user_id = int(self.token_data.sub)
+            self.admin = self.token_data.admin
 
     def __getattr__(self, name: str) -> Any:  # noqa: D401
         hints = get_type_hints(self.__class__)

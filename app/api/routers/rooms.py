@@ -39,7 +39,7 @@ async def delete_room_route(room_id: int, token_data: AdminDepends) -> None:
 
 @router.get(
     path='/{room_id}/timeslots',
-    response_model=List[STimeSlotOut],
+    response_model=List[STimeSlotOutWithBookingStatus],
     status_code=status.HTTP_200_OK,
     description="Return room timeslots by date range", )
 async def get_room_timeslots_route(room_id: int, date_range: STimeSlotDateRange) -> List[STimeSlotOutWithBookingStatus]:
@@ -52,4 +52,4 @@ async def get_room_timeslots_route(room_id: int, date_range: STimeSlotDateRange)
     status_code=status.HTTP_201_CREATED,
     description="Create new room timeslot", )
 async def create_room_timeslot(room_id: int, timeslot_data: STimeSlotCreate, admin_data: AdminDepends) -> STimeSlotOut:
-    return await RoomBusinessService.create_timeslot(room_id, timeslot_data)
+    return await RoomBusinessService().create_timeslot(room_id, timeslot_data)
