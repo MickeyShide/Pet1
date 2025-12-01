@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 from starlette import status
 
 from app.api.deps import UserDepends
@@ -28,5 +28,5 @@ async def create_booking_route(
     status_code=status.HTTP_200_OK,
     response_model=List[SBookingOutWithTimeslots],
     description="Get all user bookings with optional filters", )
-async def get_all_user_bookings(token_data: UserDepends, booking_filters: SBookingFilters | None = Query(...)) -> List[SBookingOutWithTimeslots]:
+async def get_all_user_bookings(token_data: UserDepends, booking_filters: SBookingFilters | None = Depends()) -> List[SBookingOutWithTimeslots]:
     return await BookingsBusinessService(token_data).get_my_bookings(booking_filters)
