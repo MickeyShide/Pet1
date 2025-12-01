@@ -25,7 +25,8 @@ async def get_token_data(jwt_token: HTTPBearerDepends) -> SAccessToken:
 
     try:
         return SAccessToken(**payload)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError) as e:
+        print(e)
         raise UnauthorizedException("Invalid access token subject")
 
 
