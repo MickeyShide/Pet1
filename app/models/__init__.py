@@ -8,5 +8,12 @@ from .timeslot import TimeSlot
 from .user import User
 
 __all__ = [
-    "BaseSQLModel"
+    "BaseSQLModel",
+    "Booking",
+    "Location",
+    "Room",
+    "TimeSlot",
+    "Payment",
+    "User",
+    "NotificationLog",
 ]

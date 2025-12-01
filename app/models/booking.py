@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 
 from sqlalchemy import Enum as SAEnum, Index, text
@@ -27,7 +28,7 @@ class Booking(BaseSQLModel, table=True):
         default=BookingStatus.PENDING_PAYMENTS,
         nullable=False,
     )
-    total_price: float = Field(sa_type=DECIMAL, nullable=False)
+    total_price: Decimal = Field(sa_type=DECIMAL, nullable=False)
 
     paid_at: datetime | None = Field(sa_type=TIMESTAMP(timezone=True), nullable=True)
     canceled_at: datetime | None = Field(sa_type=TIMESTAMP(timezone=True), nullable=True)

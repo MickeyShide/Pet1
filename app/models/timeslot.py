@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 
 from sqlalchemy import Enum as SAEnum, CheckConstraint, UniqueConstraint, text
@@ -22,7 +23,7 @@ class TimeSlot(BaseSQLModel, table=True):
     start_datetime: datetime = Field(sa_type=TIMESTAMP(timezone=True), nullable=False)
     end_datetime: datetime = Field(sa_type=TIMESTAMP(timezone=True), nullable=False)
 
-    base_price: float = Field(sa_type=DECIMAL, nullable=False)
+    base_price: Decimal = Field(sa_type=DECIMAL, nullable=False)
 
     status: TimeSlotStatus = Field(
         sa_type=SAEnum(TimeSlotStatus, name="timeslotstatus"),
