@@ -19,6 +19,12 @@ class SBookingBase(BaseSchema):
 class SBookingOut(SBookingBase):
     id: int
 
+class SBookingOutAfterCreate(BaseSchema):
+    id: int
+    status: BookingStatus
+    timeslot_id: int
+    total_price: Decimal
+    expires_at: datetime
 
 class SBookingCreate(BaseSchema):
     timeslot_id: int

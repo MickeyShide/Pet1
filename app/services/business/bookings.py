@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, UTC
 
 from app.db.base import new_session
 from app.models import Booking
-from app.schemas.booking import SBookingCreate, SBookingOut
+from app.schemas.booking import SBookingCreate, SBookingOut, SBookingOutAfterCreate
 from app.services.booking import BookingService
 from app.services.business.base import BaseBusinessService
 from app.services.timeslot import TimeSlotService
@@ -13,7 +13,7 @@ class BookingsBusinessService(BaseBusinessService):
     timeslot_service: TimeSlotService
 
     @new_session()
-    async def create_booking(self, booking_data: SBookingCreate):
+    async def create_booking(self, booking_data: SBookingCreate) -> SBookingOutAfterCreate:
 
         timeslot = await self.timeslot_service.lock_time_slot_for_booking(booking_data.timeslot_id)
 
@@ -25,4 +25,4 @@ class BookingsBusinessService(BaseBusinessService):
             expires_at=datetime.now(UTC) + timedelta(minutes=15),
         )
 
-        return SBookingOut.from_model(new_booking)
+        return SBookingOutAfterCreate.from_model(new_booking)
