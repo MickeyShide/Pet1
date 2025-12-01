@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from app.models.booking import BookingStatus
 from app.schemas import BaseSchema
-from app.schemas.timeslot import STimeSlotFilter, STimeSlotOut
+from app.schemas.timeslot import STimeSlotFilters, STimeSlotOut
 
 
 class SBookingBase(BaseSchema):
@@ -37,4 +37,3 @@ class SBookingCreate(BaseSchema):
 class SBookingFilters(BaseSchema):
     room_id: int | None = None
     status: BookingStatus | None = None
-    timeslot_filter: STimeSlotFilter | None = None

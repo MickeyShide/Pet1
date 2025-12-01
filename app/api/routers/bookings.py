@@ -6,6 +6,7 @@ from starlette import status
 from app.api.deps import UserDepends
 from app.schemas.booking import SBookingOut, SBookingCreate, SBookingOutAfterCreate, SBookingOutWithTimeslots, \
     SBookingFilters
+from app.schemas.timeslot import STimeSlotFilters
 from app.services.business.bookings import BookingsBusinessService
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
@@ -28,5 +29,9 @@ async def create_booking_route(
     status_code=status.HTTP_200_OK,
     response_model=List[SBookingOutWithTimeslots],
     description="Get all user bookings with optional filters", )
-async def get_all_user_bookings(token_data: UserDepends, booking_filters: SBookingFilters = Depends()) -> List[SBookingOutWithTimeslots]:
-    return await BookingsBusinessService(token_data).get_my_bookings(booking_filters)
+async def get_all_user_bookings(
+        token_data: UserDepends,
+        booking_filters: SBookingFilters = Depends(),
+        timeslot_filters: STimeSlotFilters = Depends()
+) -> List[SBookingOutWithTimeslots]:
+    return await BookingsBusinessService(token_data).get_my_bookings(booking_filters,timeslot_filters)

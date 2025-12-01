@@ -3,6 +3,7 @@ from sqlalchemy import select, and_
 from app.models import Booking, TimeSlot
 from app.repositories.base import BaseRepository
 from app.schemas.booking import SBookingFilters
+from app.schemas.timeslot import STimeSlotFilters
 
 
 class BookingRepository(BaseRepository[Booking]):
@@ -11,7 +12,8 @@ class BookingRepository(BaseRepository[Booking]):
     async def get_all_bookings_with_timeslots(
             self,
             user_id: int,
-            filters: SBookingFilters | None = None,
+            booking_filters: SBookingFilters | None = None,
+            timeslot_filters: STimeSlotFilters | None = None,
     ) -> list[tuple[Booking, TimeSlot]]:
         stmt = (
             select(self._model_cls, TimeSlot)
@@ -21,24 +23,24 @@ class BookingRepository(BaseRepository[Booking]):
 
         conditions = []
 
-        if filters is not None:
+        if booking_filters is not None:
             # фильтры по букингу
-            booking_filters = filters.model_dump(
-                exclude={"timeslot_filter"},
+            booking_filters = booking_filters.model_dump(
                 exclude_unset=True,
             )
             if booking_filters:
                 stmt = stmt.filter_by(**booking_filters)
-
-            # фильтры по таймслоту
-            ts_filter = filters.timeslot_filter
-            if ts_filter is not None:
-                if ts_filter.start_datetime is not None:
+        if timeslot_filters is not None:
+            timeslot_filters = timeslot_filters.model_dump(
+                exclude_unset=True,
+            )
+            if timeslot_filters is not None:
+                if timeslot_filters.start_datetime is not None:
                     # end_datetime таймслота >= фильтра start_datetime
-                    conditions.append(TimeSlot.end_datetime >= ts_filter.start_datetime)
-                if ts_filter.end_datetime is not None:
+                    conditions.append(TimeSlot.end_datetime >= timeslot_filters.start_datetime)
+                if timeslot_filters.end_datetime is not None:
                     # start_datetime таймслота <= фильтра end_datetime
-                    conditions.append(TimeSlot.start_datetime <= ts_filter.end_datetime)
+                    conditions.append(TimeSlot.start_datetime <= timeslot_filters.end_datetime)
 
         if conditions:
             stmt = stmt.where(and_(*conditions))

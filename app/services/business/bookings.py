@@ -5,7 +5,7 @@ from app.db.base import new_session
 from app.models import Booking, TimeSlot
 from app.schemas.booking import SBookingCreate, SBookingOut, SBookingOutAfterCreate, SBookingFilters, \
     SBookingOutWithTimeslots
-from app.schemas.timeslot import STimeSlotOut
+from app.schemas.timeslot import STimeSlotOut, STimeSlotFilters
 from app.services.booking import BookingService
 from app.services.business.base import BaseBusinessService
 from app.services.timeslot import TimeSlotService
@@ -30,11 +30,15 @@ class BookingsBusinessService(BaseBusinessService):
         return SBookingOutAfterCreate.from_model(new_booking)
 
     @new_session()
-    async def get_my_bookings(self, booking_filters: SBookingFilters | None = None) -> List[SBookingOutWithTimeslots]:
+    async def get_my_bookings(self,
+                              booking_filters: SBookingFilters | None = None,
+                              timeslot_filters: STimeSlotFilters | None = None,
+                              ) -> List[SBookingOutWithTimeslots]:
         bookings_with_timeslots: List[Tuple[Booking, TimeSlot]] = (
             await self.booking_service.get_all_bookings_with_timeslots(
                 user_id=self.user_id,
-                filters=booking_filters,
+                booking_filters=booking_filters,
+                timeslot_filters=timeslot_filters,
             )
         )
 
