@@ -16,6 +16,7 @@ class SLogin(BaseSchema):
 class SAccessToken(BaseSchema):
     sub: str
     admin: bool
+    exp: int
 
 
 class SRefreshToken(BaseSchema):
