@@ -25,15 +25,10 @@ class BookingRepository(BaseRepository[Booking]):
 
         if booking_filters is not None:
             # фильтры по букингу
-            booking_filters = booking_filters.model_dump(
-                exclude_unset=True,
-            )
+            booking_filters = booking_filters
             if booking_filters:
-                stmt = stmt.filter_by(**booking_filters)
+                stmt = stmt.filter_by(**booking_filters.model_dump(exclude_unset=True))
         if timeslot_filters is not None:
-            timeslot_filters = timeslot_filters.model_dump(
-                exclude_unset=True,
-            )
             if timeslot_filters is not None:
                 if timeslot_filters.start_datetime is not None:
                     # end_datetime таймслота >= фильтра start_datetime
