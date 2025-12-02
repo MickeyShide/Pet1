@@ -7,3 +7,4 @@
 .idea/dictionaries/project.xml
 .idea/inspectionProfiles/profiles_settings.xml
 /tests/test_db.sqlite3
+/.idea/dataSources.xml
