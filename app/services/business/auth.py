@@ -56,7 +56,7 @@ class AuthBusinessService(BaseBusinessService):
     @new_session()
     async def register(self, user_data: SRegister) -> SUserOut:
         result: User = await self.user_service.create_user(user_data)
-        return SUserOut(**result.model_dump())
+        return SUserOut.from_model(result)
 
     @new_session()
     async def login(self, response: Response, login_data: SLogin) -> STokenOut:
@@ -90,4 +90,4 @@ class AuthBusinessService(BaseBusinessService):
     @new_session()
     async def get_me(self) -> SUserOut:
         user: User = await self.user_service.get_one_by_id(int(self.token_data.sub))
-        return SUserOut(**user.model_dump())
+        return SUserOut.from_model(user)

@@ -16,17 +16,17 @@ class LocationBusinessService(BaseBusinessService):
     @new_session(readonly=True)
     async def get_all(self) -> list[SLocationOut]:
         locations: List[Location] = await self.location_service.get_all()
-        return [SLocationOut(**location.model_dump()) for location in locations]
+        return [SLocationOut.from_model(location) for location in locations]
 
     @new_session(readonly=True)
     async def get_by_id(self, location_id: int) -> SLocationOut:
         location: Location = await self.location_service.get_one_by_id(location_id)
-        return SLocationOut(**location.model_dump())
+        return SLocationOut.from_model(location)
 
     @new_session()
     async def create_location(self, location_data: SLocationCreate) -> SLocationOut:
         location: Location = await self.location_service.create(**location_data.model_dump())
-        return SLocationOut(**location.model_dump())
+        return SLocationOut.from_model(location)
 
     @new_session()
     async def update_by_id(self, location_id: int, location_data: SLocationUpdate) -> SLocationOut:
@@ -34,7 +34,7 @@ class LocationBusinessService(BaseBusinessService):
             location_id,
             **location_data.model_dump(exclude_unset=True)
         )
-        return SLocationOut(**location.model_dump())
+        return SLocationOut.from_model(location)
 
     @new_session()
     async def delete_by_id(self, location_id: int) -> None:
@@ -43,4 +43,4 @@ class LocationBusinessService(BaseBusinessService):
     @new_session(readonly=True)
     async def get_rooms_by_location_id(self, location_id: int) -> List[SRoomOut]:
         rooms: List[Room] = await self.room_service.find_all_by_filters(location_id=location_id)
-        return [SRoomOut(**room.model_dump()) for room in rooms]
+        return [SRoomOut.from_model(room) for room in rooms]

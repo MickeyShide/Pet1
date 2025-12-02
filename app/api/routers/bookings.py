@@ -1,12 +1,13 @@
 from typing import List
 
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Depends
 from starlette import status
 
 from app.api.deps import UserDepends
 from app.schemas.booking import SBookingOut, SBookingCreate, SBookingOutAfterCreate, SBookingOutWithTimeslots, \
     SBookingFilters
 from app.schemas.timeslot import STimeSlotFilters
+from app.models.booking import BookingStatus
 from app.services.business.bookings import BookingsBusinessService
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
@@ -31,7 +32,15 @@ async def create_booking_route(
     description="Get all user bookings with optional filters", )
 async def get_all_user_bookings(
         token_data: UserDepends,
-        booking_filters: SBookingFilters = Depends(),
+        room_id: int | None = None,
+        status: BookingStatus | None = None,
         timeslot_filters: STimeSlotFilters = Depends()
 ) -> List[SBookingOutWithTimeslots]:
-    return await BookingsBusinessService(token_data).get_my_bookings(booking_filters,timeslot_filters)
+    booking_filters = SBookingFilters(
+        room_id=room_id,
+        status=status,
+    )
+    return await BookingsBusinessService(token_data).get_my_bookings(
+        booking_filters=booking_filters,
+        timeslot_filters=timeslot_filters,
+    )
