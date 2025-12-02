@@ -238,3 +238,50 @@ async def test__get_user_bookings__filters_by_timeslot_range(async_client, db_se
     data = response.json()
     assert len(data) == 1
     assert data[0]["booking"]["id"] == target_booking.id
+
+
+@pytest.mark.asyncio
+async def test__get_booking_by_id_route__returns_booking_for_user(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    booking = await create_booking(db_session, user=user, room=room, timeslot=slot)
+    await db_session.commit()
+
+    response = await async_client.get(f"/bookings/{booking.id}")
+
+    async_client.app_ref.dependency_overrides.clear()
+    # ❗BUG FOUND: repository filters on TimeSlot.user_id (field missing) which raises 500 for non-admins.
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_booking_by_id_route__works_for_admin(async_client, db_session, faker):
+    admin = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(admin.id), admin=True)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    booking_user = await create_user(db_session, faker)
+    booking = await create_booking(db_session, user=booking_user, room=room, timeslot=slot)
+    await db_session.commit()
+
+    response = await async_client.get(f"/bookings/{booking.id}")
+
+    async_client.app_ref.dependency_overrides.clear()
+    # ❗BUG FOUND: repository tries to access row[2] although select only returns two columns -> IndexError -> 500.
+    assert response.status_code == 200, response.text

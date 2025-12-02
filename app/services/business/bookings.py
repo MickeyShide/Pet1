@@ -49,3 +49,26 @@ class BookingsBusinessService(BaseBusinessService):
             )
             for booking, timeslot in bookings_with_timeslots
         ]
+
+    @new_session(readonly=True)
+    async def get_booking_by_id(self, booking_id: int) -> SBookingOutWithTimeslots:
+        booking, timeslot = (
+            await self.booking_service.get_booking_with_timeslots_by_id(
+                user_id=self.user_id,
+                booking_id=booking_id,
+                is_admin=self.admin
+            )
+        )
+
+        return SBookingOutWithTimeslots(
+            booking=SBookingOut.from_model(booking),
+            timeslot=STimeSlotOut.from_model(timeslot),
+        )
+
+    @new_session()
+    async def cancel_booking(self, booking_id: int) -> bool:
+        return await self.booking_service.cancel_booking(
+            booking_id=booking_id,
+            user_id=self.user_id,
+            is_admin=self.admin
+        )
