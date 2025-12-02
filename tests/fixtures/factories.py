@@ -100,7 +100,7 @@ async def create_booking(
         total_price=timeslot.base_price,
         paid_at=None,
         canceled_at=None,
-        expires_at=timeslot.end_datetime + expires_delta,
+        expires_at=datetime.now(timezone.utc) + expires_delta,
     )
     if created_at is None:
         created_at = datetime.now(timezone.utc)
