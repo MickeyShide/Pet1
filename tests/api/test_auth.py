@@ -121,7 +121,6 @@ async def test__login_unknown_email_returns_unauthorized(async_client, db_sessio
 
     response = await async_client.post("/auth/login", json=payload)
 
-    # ❗BUG FOUND: ожидался 401, но сервис возвращает 404, раскрывая наличие пользователей.
     assert response.status_code == 401, response.text
 
 

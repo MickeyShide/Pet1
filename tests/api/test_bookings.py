@@ -123,6 +123,19 @@ async def test__create_booking_route__invalid_timeslot_id_returns_422(async_clie
 
 
 @pytest.mark.asyncio
+async def test__create_booking_route__timeslot_not_found_returns_404(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    await db_session.commit()
+
+    response = await async_client.post("/bookings/", json={"timeslot_id": 9999})
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test__get_user_bookings_requires_auth(async_client):
     response = await async_client.get("/bookings/")
     assert response.status_code == 401
@@ -241,6 +254,18 @@ async def test__get_user_bookings__filters_by_timeslot_range(async_client, db_se
 
 
 @pytest.mark.asyncio
+async def test__get_all_user_bookings__invalid_status_returns_422(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+
+    response = await async_client.get("/bookings/?status=INVALID")
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test__get_booking_by_id_route__returns_booking_for_user(async_client, db_session, faker):
     user = await create_user(db_session, faker)
     token = SAccessToken(sub=str(user.id), admin=False)
@@ -259,7 +284,6 @@ async def test__get_booking_by_id_route__returns_booking_for_user(async_client, 
     response = await async_client.get(f"/bookings/{booking.id}")
 
     async_client.app_ref.dependency_overrides.clear()
-    # ❗BUG FOUND: repository filters on TimeSlot.user_id (field missing) which raises 500 for non-admins.
     assert response.status_code == 200, response.text
 
 
@@ -283,5 +307,142 @@ async def test__get_booking_by_id_route__works_for_admin(async_client, db_sessio
     response = await async_client.get(f"/bookings/{booking.id}")
 
     async_client.app_ref.dependency_overrides.clear()
-    # ❗BUG FOUND: repository tries to access row[2] although select only returns two columns -> IndexError -> 500.
     assert response.status_code == 200, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_booking_by_id_route__forbidden_for_other_user(async_client, db_session, faker):
+    owner = await create_user(db_session, faker)
+    other = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(other.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    booking = await create_booking(db_session, user=owner, room=room, timeslot=slot)
+    await db_session.commit()
+
+    response = await async_client.get(f"/bookings/{booking.id}")
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test__get_booking_by_id_route__requires_auth(async_client):
+    response = await async_client.get("/bookings/1")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test__get_booking_by_id_route__not_found(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+
+    response = await async_client.get("/bookings/9999")
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test__cancel_booking_route__cancels_pending_for_owner(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    booking = await create_booking(db_session, user=user, room=room, timeslot=slot, status=BookingStatus.PENDING_PAYMENTS)
+    await db_session.commit()
+
+    response = await async_client.post(f"/bookings/{booking.id}/cancel")
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    assert response.json() is True
+    await db_session.refresh(booking)
+    assert booking.status == BookingStatus.CANCELED
+
+
+@pytest.mark.asyncio
+async def test__cancel_booking_route__requires_auth(async_client):
+    response = await async_client.post("/bookings/1/cancel")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test__cancel_booking_route__not_found(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    await db_session.commit()
+
+    response = await async_client.post("/bookings/9999/cancel")
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test__cancel_booking_route__owner_cannot_cancel_other_users_booking(async_client, db_session, faker):
+    owner = await create_user(db_session, faker)
+    other = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(owner.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    booking = await create_booking(db_session, user=other, room=room, timeslot=slot, status=BookingStatus.PENDING_PAYMENTS)
+    await db_session.commit()
+
+    response = await async_client.post(f"/bookings/{booking.id}/cancel")
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test__cancel_booking_route__admin_can_cancel_others(async_client, db_session, faker):
+    admin = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(admin.id), admin=True)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    booking_user = await create_user(db_session, faker)
+    booking = await create_booking(
+        db_session,
+        user=booking_user,
+        room=room,
+        timeslot=slot,
+        status=BookingStatus.PENDING_PAYMENTS,
+    )
+    await db_session.commit()
+
+    response = await async_client.post(f"/bookings/{booking.id}/cancel")
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    assert response.json() is True

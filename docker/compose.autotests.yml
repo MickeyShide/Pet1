@@ -1,0 +1,22 @@
+version: "3.12"
+
+services:
+  db-autotests:
+    image: postgres:16-alpine
+    container_name: fastapi_pet1-db-autotests
+    ports:
+      - "5438:5432"
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: fastapi_pet_1_autotests
+    volumes:
+      - db-data-autotests:/var/lib/postgresql/data
+    networks:
+      - local-net
+
+networks:
+  local-net:
+
+volumes:
+  db-data-autotests:
