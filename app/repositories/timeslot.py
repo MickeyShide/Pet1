@@ -37,7 +37,7 @@ class TimeSlotRepository(BaseRepository[TimeSlot]):
                 isouter=True,  # LEFT JOIN
             )
             .where(self._model_cls.id == timeslot_id)
-            .with_for_update()
+            .with_for_update(of=self._model_cls)
         )
 
         result = await self.session.execute(stmt)

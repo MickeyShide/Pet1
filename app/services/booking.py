@@ -6,6 +6,7 @@ from app.repositories.booking import BookingRepository
 from app.schemas.booking import SBookingFilters
 from app.schemas.timeslot import STimeSlotFilters
 from app.services.base import BaseService
+from app.utils.err.base.conflict import ConflictException
 from app.utils.err.base.not_found import NotFoundException
 
 
@@ -41,9 +42,17 @@ class BookingService(BaseService[Booking]):
 
     async def cancel_booking(self, booking_id: int, user_id: int, is_admin: bool) -> bool:
         try:
+            old_booking_status: BookingStatus = await self._repository.check_booking_status(
+                booking_id=booking_id, user_id=user_id, is_admin=is_admin
+            )
+
+            if old_booking_status is not BookingStatus.PENDING_PAYMENTS:
+                raise ConflictException(f"Booking with id {booking_id} status: {old_booking_status.value}")
+
             updated_booking: Booking = await self._repository.cancel_booking(
                 booking_id=booking_id, user_id=user_id, is_admin=is_admin
             )
+
             if updated_booking.status == BookingStatus.CANCELED:
                 return True
 

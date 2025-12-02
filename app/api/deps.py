@@ -10,10 +10,13 @@ from app.schemas.auth import SAccessToken
 from app.utils.err.base.forbidden import ForbiddenException
 from app.utils.err.base.unauthorized import UnauthorizedException
 
-HTTPBearerDepends = Annotated[HTTPAuthorizationCredentials, Depends(HTTPBearer())]
+_http_bearer = HTTPBearer(auto_error=False)
+HTTPBearerDepends = Annotated[HTTPAuthorizationCredentials | None, Depends(_http_bearer)]
 
 
 async def get_token_data(jwt_token: HTTPBearerDepends) -> SAccessToken:
+    if jwt_token is None:
+        raise UnauthorizedException("Missing access token")
     try:
         payload = jwt.decode(
             jwt_token.credentials,

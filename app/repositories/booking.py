@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import select, update
 
 from app.models import Booking, TimeSlot
@@ -59,13 +61,29 @@ class BookingRepository(BaseRepository[Booking]):
         row = res.one()
 
         return row[0], row[1]  # Booking, TimeSlot
-    
+
+    async def check_booking_status(self, booking_id: int, user_id: int, is_admin: bool) -> BookingStatus:
+        stmt = (
+            select(self._model_cls.status)
+            .where(self._model_cls.id == booking_id)
+        )
+
+        if not is_admin:
+            stmt = stmt.where(self._model_cls.user_id == user_id)
+
+        res = await self.session.execute(stmt)
+
+        return res.scalar_one()
+
     async def cancel_booking(self, booking_id: int, user_id: int, is_admin: bool) -> Booking:
         stmt = (
             update(self._model_cls)
             .where(self._model_cls.id == booking_id)
             .where(self._model_cls.status == BookingStatus.PENDING_PAYMENTS)
-            .values(status=BookingStatus.CANCELED)
+            .values(
+                status=BookingStatus.CANCELED,
+                canceled_at=datetime.now(timezone.utc),
+            )
             .returning(self._model_cls)
         )
 
