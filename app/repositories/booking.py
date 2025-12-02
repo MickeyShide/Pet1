@@ -75,6 +75,22 @@ class BookingRepository(BaseRepository[Booking]):
 
         return res.scalar_one()
 
+    async def set_booking_paid(self, booking_id: int) -> Booking:
+        stmt = (
+            update(self._model_cls)
+            .where(self._model_cls.id == booking_id)
+            .where(self._model_cls.status == BookingStatus.PENDING_PAYMENTS)
+            .where(self._model_cls.expires_at > datetime.now(timezone.utc))
+            .values(status=BookingStatus.PAID, paid_at=datetime.now(timezone.utc))
+            .returning(self._model_cls)
+        )
+
+        res = await self.session.execute(stmt)
+
+        return res.one()[0]
+
+
+
     async def cancel_booking(self, booking_id: int, user_id: int, is_admin: bool) -> Booking:
         stmt = (
             update(self._model_cls)

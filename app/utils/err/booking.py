@@ -10,3 +10,7 @@ class SlotAlreadyTaken(ConflictException):
 class TimeSlotNotFound(NotFoundException):
     def __init__(self):
         super().__init__("Timeslot not found")
+
+class BookingNotFound(NotFoundException):
+    def __init__(self):
+        super().__init__("Booking not found")

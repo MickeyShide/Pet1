@@ -7,8 +7,10 @@ from app.api.deps import UserDepends
 from app.models.booking import BookingStatus
 from app.schemas.booking import SBookingCreate, SBookingOutAfterCreate, SBookingOutWithTimeslots, \
     SBookingFilters
+from app.schemas.payment import SPaymentOut
 from app.schemas.timeslot import STimeSlotFilters
 from app.services.business.bookings import BookingsBusinessService
+from app.services.business.payments import PaymentBusinessService
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
 
@@ -69,3 +71,15 @@ async def cancel_booking(
         booking_id: int
 ) -> bool:
     return await BookingsBusinessService(token_data).cancel_booking(booking_id)
+
+
+@router.post(
+    path="/{booking_id}/payments",
+    status_code=status.HTTP_200_OK,
+    response_model=SPaymentOut,
+    description="Payments booking", )
+async def create_payment_route(
+        token_data: UserDepends,
+        booking_id: int,
+) -> SPaymentOut:
+    return await PaymentBusinessService(token_data).create_payment(booking_id)

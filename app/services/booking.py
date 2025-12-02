@@ -8,6 +8,7 @@ from app.schemas.timeslot import STimeSlotFilters
 from app.services.base import BaseService
 from app.utils.err.base.conflict import ConflictException
 from app.utils.err.base.not_found import NotFoundException
+from app.utils.err.booking import BookingNotFound
 
 
 class BookingService(BaseService[Booking]):
@@ -39,6 +40,12 @@ class BookingService(BaseService[Booking]):
             )
         except NoResultFound:
             raise NotFoundException(f"Booking with id {booking_id} not found")
+
+    async def set_booking_paid(self, booking_id: int) -> Booking:
+        try:
+            return await self._repository.set_booking_paid(booking_id=booking_id)
+        except NoResultFound:
+            raise BookingNotFound()
 
     async def cancel_booking(self, booking_id: int, user_id: int, is_admin: bool) -> bool:
         try:
