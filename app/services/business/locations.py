@@ -7,16 +7,29 @@ from app.schemas.room import SRoomOut
 from app.services.business.base import BaseBusinessService
 from app.services.location import LocationService
 from app.services.room import RoomService
+from app.utils.cache import CacheService, keys
 
 
 class LocationBusinessService(BaseBusinessService):
     location_service: LocationService
     room_service: RoomService
 
+    _location_tll_seconds: int = 6
+
     @new_session(readonly=True)
     async def get_all(self) -> list[SLocationOut]:
+
+        cache = CacheService[list[SLocationOut]](model=SLocationOut, collection=True)
+        cache_key = keys.locations_all()
+        cached = await cache.try_get(cache_key)
+        if cached is not None:
+            return cached
+
         locations: List[Location] = await self.location_service.get_all()
-        return [SLocationOut.from_model(location) for location in locations]
+        retult: list[SLocationOut] = [SLocationOut.from_model(location) for location in locations]
+        await cache.try_set(cache_key, retult, ttl=self._location_tll_seconds)
+
+        return retult
 
     @new_session(readonly=True)
     async def get_by_id(self, location_id: int) -> SLocationOut:
@@ -26,6 +39,7 @@ class LocationBusinessService(BaseBusinessService):
     @new_session()
     async def create_location(self, location_data: SLocationCreate) -> SLocationOut:
         location: Location = await self.location_service.create(**location_data.model_dump())
+        await CacheService().delete_pattern(keys.locations_all())
         return SLocationOut.from_model(location)
 
     @new_session()
@@ -34,11 +48,13 @@ class LocationBusinessService(BaseBusinessService):
             location_id,
             **location_data.model_dump(exclude_unset=True)
         )
+        await CacheService().delete_pattern(keys.locations_all())
         return SLocationOut.from_model(location)
 
     @new_session()
     async def delete_by_id(self, location_id: int) -> None:
         await self.location_service.delete_by_id(location_id)
+        await CacheService().delete_pattern(keys.locations_all())
 
     @new_session(readonly=True)
     async def get_rooms_by_location_id(self, location_id: int) -> List[SRoomOut]:

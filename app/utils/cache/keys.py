@@ -10,6 +10,9 @@ def _format_dt(dt: datetime) -> str:
 def login_ip(ip: str):
     return f"login:{ip}"
 
+def locations_all() -> str:
+    return f"locations:all"
+
 
 def timeslots_by_room_and_range(room_id: int, date_from: datetime, date_to: datetime) -> str:
     return f"timeslots:{room_id}:{_format_dt(date_from)}:{_format_dt(date_to)}"

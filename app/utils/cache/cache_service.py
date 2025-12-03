@@ -43,7 +43,6 @@ class CacheService(Generic[T]):
 
     def __init__(
             self,
-            *,
             model: Type[BaseSchema] | None = None,
             collection: bool = False,
             redis_client: Redis | None = None,
