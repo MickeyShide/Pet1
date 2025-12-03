@@ -1,19 +1,23 @@
-from typing import List, Tuple
+from typing import List
 
 from app.db.base import new_session
-from app.models import Room, TimeSlot
+from app.models import Room
 from app.schemas.room import SRoomOut, SRoomCreate, SRoomUpdate
 from app.schemas.timeslot import STimeSlotDateRange, STimeSlotOutWithBookingStatus, STimeSlotCreate, STimeSlotOut
 from app.services.business.base import BaseBusinessService
 from app.services.location import LocationService
 from app.services.room import RoomService
 from app.services.timeslot import TimeSlotService
+from app.utils.cache import keys as cache_keys
+from app.utils.cache.cache_service import CacheService
 
 
 class RoomBusinessService(BaseBusinessService):
     location_service: LocationService
     room_service: RoomService
     timeslots_service: TimeSlotService
+
+    _timeslot_cache_ttl_seconds: int = 30
 
     @new_session()
     async def create_by_location_id(self, location_id: int, room_data: SRoomCreate) -> SRoomOut:
@@ -43,21 +47,36 @@ class RoomBusinessService(BaseBusinessService):
             room_id: int,
             date_range: STimeSlotDateRange
     ) -> List[STimeSlotOutWithBookingStatus]:
-        timeslots_with_booking: List[Tuple[TimeSlot, bool]] = (
-            await self.timeslots_service.get_all_by_room_id_and_date_range(
-                room_id=room_id, date_from=date_range.date_from, date_to=date_range.date_to
-            )
-        )
 
-        return [
-            STimeSlotOutWithBookingStatus(
-                **STimeSlotOut.from_model(slot).model_dump(),
-                has_active_booking=has_active_booking
+        cache = CacheService[List[STimeSlotOutWithBookingStatus]](model=STimeSlotOutWithBookingStatus, collection=True)
+        cache_key = cache_keys.timeslots_by_room_and_range(
+            room_id=room_id, date_from=date_range.date_from, date_to=date_range.date_to
+        )
+        cached: List[STimeSlotOutWithBookingStatus] = await cache.try_get(cache_key)
+
+        if cached is not None:
+            timeslot_dicts = cached
+        else:
+            print("NOT CACHED")
+            timeslots_with_booking = await self.timeslots_service.get_all_by_room_id_and_date_range(
+                room_id=room_id,
+                date_from=date_range.date_from,
+                date_to=date_range.date_to,
             )
-            for slot, has_active_booking in timeslots_with_booking
-        ]
+            timeslot_dicts: List[STimeSlotOutWithBookingStatus] = [
+                STimeSlotOutWithBookingStatus(
+                    **STimeSlotOut.from_model(slot).model_dump(),
+                    has_active_booking=has_active_booking,
+                )
+                for slot, has_active_booking in timeslots_with_booking
+            ]
+            # CACHE! Key: timeslots:{room_id}:{date_from}:{date_to} TTL: 30s
+            await cache.try_set(cache_key, timeslot_dicts, ttl=self._timeslot_cache_ttl_seconds)
+
+        return timeslot_dicts
 
     @new_session()
     async def create_timeslot(self, room_id: int, timeslot_data: STimeSlotCreate) -> STimeSlotOut:
         new_slot = await self.timeslots_service.create(room_id=room_id, **timeslot_data.model_dump())
+        await CacheService().delete_pattern(cache_keys.timeslots_room_prefix(room_id))
         return STimeSlotOut.from_model(new_slot)

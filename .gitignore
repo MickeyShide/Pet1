@@ -9,3 +9,5 @@
 /tests/test_db.sqlite3
 /.idea/dataSources.xml
 /test_db.sqlite3
+__pycache__/
+*.pyc

@@ -18,8 +18,15 @@ services:
   redis:
     image: redis:7-alpine
     container_name: fastapi_pet1-redis-local
+    volumes:
+      - redis-data-local:/data
     ports:
       - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - local-net
 
@@ -34,11 +41,18 @@ services:
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 15
       REFRESH_TOKEN_EXPIRE_DAYS: 7
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      REDIS_PASSWORD: ""
+      REDIS_CACHE_PREFIX: "myapp:cache:"
     ports:
       - "4004:4000"
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_started
+      redis:
+        condition: service_healthy
     volumes:
       - ../:/var/www
     command: ["-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "4000", "--reload"]
@@ -50,4 +64,4 @@ networks:
 
 volumes:
   db-data-local:
-
+  redis-data-local:
