@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from redis import Redis
+from redis.asyncio import Redis
 
 from app.config import settings
 

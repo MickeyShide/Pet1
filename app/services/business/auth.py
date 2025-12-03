@@ -21,7 +21,7 @@ from app.utils.security import create_access_token, create_refresh_token, verify
 class AuthBusinessService(BaseBusinessService):
     user_service: UserService
 
-    _antifraud_ttl_minutes = 5
+    _antifraud_ttl_minutes = 0.1
 
     @staticmethod
     def _generate_tokens_and_cookie(response: Response, user: User) -> tuple[str, str]:
@@ -73,7 +73,8 @@ class AuthBusinessService(BaseBusinessService):
             await cache.try_set(cache_key, cached + 1, ttl=self._antifraud_ttl_minutes * 60)
             if cached >= 5:
                 raise TooManyAttempts()
-
+        else:
+            await cache.try_set(cache_key, 1, ttl=self._antifraud_ttl_minutes * 60)
         user: User = await self.user_service.login(login_data)
 
         access_token, refresh_token = self._generate_tokens_and_cookie(response=response, user=user)
