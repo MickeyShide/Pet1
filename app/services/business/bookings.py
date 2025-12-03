@@ -32,10 +32,11 @@ class BookingsBusinessService(BaseBusinessService):
         return SBookingOutAfterCreate.from_model(new_booking)
 
     @new_session()
-    async def get_my_bookings(self,
-                              booking_filters: SBookingFilters | None = None,
-                              timeslot_filters: STimeSlotFilters | None = None,
-                              ) -> List[SBookingOutWithTimeslots]:
+    async def get_my_bookings(
+            self,
+            booking_filters: SBookingFilters | None = None,
+            timeslot_filters: STimeSlotFilters | None = None,
+    ) -> List[SBookingOutWithTimeslots]:
         bookings_with_timeslots: List[Tuple[Booking, TimeSlot]] = (
             await self.booking_service.get_all_bookings_with_timeslots(
                 user_id=self.user_id,
@@ -70,10 +71,10 @@ class BookingsBusinessService(BaseBusinessService):
     @new_session()
     async def cancel_booking(self, booking_id: int) -> bool:
         booking: Booking = await self.booking_service.get_one_by_id(booking_id)
-        await CacheService().delete_pattern(cache_keys.timeslots_room_prefix(booking.room_id))
-        return await self.booking_service.cancel_booking(
+        result = await self.booking_service.cancel_booking(
             booking_id=booking_id,
             user_id=self.user_id,
             is_admin=self.admin
         )
-
+        await CacheService().delete_pattern(cache_keys.timeslots_room_prefix(booking.room_id))
+        return result

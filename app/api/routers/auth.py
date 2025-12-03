@@ -25,8 +25,8 @@ async def register_route(user_data: SRegister) -> SUserOut:
     response_model=STokenOut,
     status_code=status.HTTP_200_OK,
     description="Login a user", )
-async def login_route(response: Response, login_data: SLogin) -> STokenOut:
-    return await AuthBusinessService().login(response, login_data)
+async def login_route(request: Request, response: Response, login_data: SLogin) -> STokenOut:
+    return await AuthBusinessService().login(request, response, login_data)
 
 
 @router.post(

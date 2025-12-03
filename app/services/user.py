@@ -6,8 +6,8 @@ from app.repositories.user import UserRepository
 from app.schemas.auth import SRegister, SLogin
 from app.services.base import BaseService
 from app.utils.err.auth import EmailAlreadyTaken, UsernameAlreadyTaken
-from app.utils.err.base.unauthorized import UnauthorizedException
 from app.utils.err.base.not_found import NotFoundException
+from app.utils.err.base.unauthorized import UnauthorizedException
 from app.utils.security import hash_password, verify_password
 
 

@@ -61,9 +61,11 @@ async def test__login__returns_access_token_and_sets_cookie(db_session, faker):
     )
     await service.register(payload)
     response = Response()
+    request = Request({"type": "http", "headers": []})
 
     # When
     token_out = await service.login(
+        request,
         response,
         SLogin(email=payload.email, password=payload.password),
     )

@@ -37,6 +37,7 @@ class STimeSlotUpdate(BaseSchema):
     status: TimeSlotStatus | None = None
     room_id: int | None = None
 
+
 class STimeSlotFilters(BaseSchema):
     start_datetime: datetime | None = None
     end_datetime: datetime | None = None

@@ -10,6 +10,9 @@ from app.schemas.auth import SRegister, SLogin, STokenOut, SAccessToken, SRefres
 from app.schemas.user import SUserOut
 from app.services.business.base import BaseBusinessService
 from app.services.user import UserService
+from app.utils.cache import CacheService
+from app.utils.cache import keys as cache_keys
+from app.utils.err.auth import TooManyAttempts
 from app.utils.err.base.not_found import NotFoundException
 from app.utils.err.base.unauthorized import UnauthorizedException
 from app.utils.security import create_access_token, create_refresh_token, verify_token
@@ -17,6 +20,8 @@ from app.utils.security import create_access_token, create_refresh_token, verify
 
 class AuthBusinessService(BaseBusinessService):
     user_service: UserService
+
+    _antifraud_ttl_minutes = 5
 
     @staticmethod
     def _generate_tokens_and_cookie(response: Response, user: User) -> tuple[str, str]:
@@ -59,7 +64,16 @@ class AuthBusinessService(BaseBusinessService):
         return SUserOut.from_model(result)
 
     @new_session()
-    async def login(self, response: Response, login_data: SLogin) -> STokenOut:
+    async def login(self, request: Request, response: Response, login_data: SLogin) -> STokenOut:
+        cache = CacheService()
+        ip: str | None = request.headers.get("X-Real-IP")
+        cache_key = cache_keys.login_ip(ip)
+        cached = await cache.try_get(cache_key)
+        if cached is not None:
+            await cache.try_set(cache_key, cached + 1, ttl=self._antifraud_ttl_minutes * 60)
+            if cached >= 5:
+                raise TooManyAttempts()
+
         user: User = await self.user_service.login(login_data)
 
         access_token, refresh_token = self._generate_tokens_and_cookie(response=response, user=user)

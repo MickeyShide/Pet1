@@ -7,8 +7,10 @@ class SPaymentBase(BaseSchema):
     external_id: str
     status: PaymentStatus
 
+
 class SPaymentOut(SPaymentBase):
     id: int
+
 
 class SPaymentCreate(BaseSchema):
     booking_id: int

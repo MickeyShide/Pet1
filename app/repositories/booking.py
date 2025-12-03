@@ -89,8 +89,6 @@ class BookingRepository(BaseRepository[Booking]):
 
         return res.one()[0]
 
-
-
     async def cancel_booking(self, booking_id: int, user_id: int, is_admin: bool) -> Booking:
         stmt = (
             update(self._model_cls)

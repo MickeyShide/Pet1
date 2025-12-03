@@ -1,5 +1,5 @@
 import json
-from typing import Any, Generic, TypeVar, Type
+from typing import Generic, TypeVar, Type
 
 from redis.asyncio import Redis
 
@@ -42,12 +42,12 @@ class CacheService(Generic[T]):
     """
 
     def __init__(
-        self,
-        *,
-        model: Type[BaseSchema] | None = None,
-        collection: bool = False,
-        redis_client: Redis | None = None,
-        prefix: str | None = None,
+            self,
+            *,
+            model: Type[BaseSchema] | None = None,
+            collection: bool = False,
+            redis_client: Redis | None = None,
+            prefix: str | None = None,
     ) -> None:
         # model = None → «сырой JSON» режим (dict/list/primitive)
         if model is not None and not issubclass(model, BaseSchema):
@@ -200,7 +200,7 @@ class CacheService(Generic[T]):
 
         try:
             async for prefixed_key in client.scan_iter(
-                match=self._full_key(pattern)
+                    match=self._full_key(pattern)
             ):
                 await client.delete(prefixed_key)
         except Exception:

@@ -7,6 +7,10 @@ def _format_dt(dt: datetime) -> str:
     return dt.isoformat()
 
 
+def login_ip(ip: str):
+    return f"login:{ip}"
+
+
 def timeslots_by_room_and_range(room_id: int, date_from: datetime, date_to: datetime) -> str:
     return f"timeslots:{room_id}:{_format_dt(date_from)}:{_format_dt(date_to)}"
 

@@ -5,8 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 
 from app.api import routers
-from app.utils.redis import init_redis, close_redis
 from app.db.base import init_engine, dispose_engine
+from app.utils.redis import init_redis, close_redis
 
 
 @asynccontextmanager
@@ -51,6 +51,7 @@ def get_real_ip(request: Request) -> str:
 
     return request.client.host
 
+
 @app.get("/debug/ip")
 async def debug_ip(request: Request):
     return {
@@ -59,6 +60,7 @@ async def debug_ip(request: Request):
         "client": request.client.host,
         "real_ip": get_real_ip(request),
     }
+
 
 if __name__ == "__main__":
     import uvicorn
