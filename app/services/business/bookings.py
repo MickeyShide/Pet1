@@ -11,6 +11,7 @@ from app.services.business.base import BaseBusinessService
 from app.services.timeslot import TimeSlotService
 from app.utils.cache import CacheService
 from app.utils.cache import keys as cache_keys
+from app.celery_app.tasks import expire_booking
 
 
 class BookingsBusinessService(BaseBusinessService):
@@ -28,6 +29,10 @@ class BookingsBusinessService(BaseBusinessService):
             total_price=timeslot.base_price,
             expires_at=datetime.now(UTC) + timedelta(minutes=15),
         )
+        try:
+            expire_booking.apply_async(args=[new_booking.id], eta=new_booking.expires_at)
+        except Exception as exc:
+            # TODO сюда логгер
         await CacheService().delete_pattern(cache_keys.timeslots_room_prefix(timeslot.room_id))
         return SBookingOutAfterCreate.from_model(new_booking)
 

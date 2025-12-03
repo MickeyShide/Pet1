@@ -19,6 +19,14 @@ class Settings(BaseSettings):
     REDIS_DB: int = 0
     REDIS_PASSWORD: str = ""
     REDIS_CACHE_PREFIX: str = "myapp:cache:"
+    # RabbitMQ / Celery
+    RABBITMQ_HOST: str = "localhost"
+    RABBITMQ_PORT: int = 5672
+    RABBITMQ_USER: str = "guest"
+    RABBITMQ_PASSWORD: str = "guest"
+    RABBITMQ_VHOST: str = "/"
+    CELERY_BROKER_URL: str = ""
+    CELERY_RESULT_BACKEND: str = ""
 
     model_config = SettingsConfigDict(
         env_file=f"{Path(__file__).resolve().parent}/.env",  # откуда читать

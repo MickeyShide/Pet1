@@ -30,6 +30,26 @@ services:
     networks:
       - local-net
 
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: fastapi_pet1-rabbitmq-local
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: app
+      RABBITMQ_DEFAULT_PASS: app
+      RABBITMQ_DEFAULT_VHOST: /
+    volumes:
+      - rabbitmq-data-local:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - local-net
+
   backend:
     build:
       context: ../
@@ -46,6 +66,13 @@ services:
       REDIS_DB: 0
       REDIS_PASSWORD: ""
       REDIS_CACHE_PREFIX: "myapp:cache:"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: app
+      RABBITMQ_PASSWORD: app
+      RABBITMQ_VHOST: /
+      CELERY_BROKER_URL: ""
+      CELERY_RESULT_BACKEND: ""
     ports:
       - "4004:4000"
     depends_on:
@@ -53,9 +80,45 @@ services:
         condition: service_started
       redis:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     volumes:
       - ../:/var/www
     command: ["-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "4000", "--reload"]
+    networks:
+      - local-net
+
+  worker:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    container_name: fastapi_pet1-worker-local
+    environment:
+      DATABASE_URL: postgresql+asyncpg://app:app@db/fastapi_pet_1
+      SECRET_KEY: secret
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 15
+      REFRESH_TOKEN_EXPIRE_DAYS: 7
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+      REDIS_PASSWORD: ""
+      REDIS_CACHE_PREFIX: "myapp:cache:"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: app
+      RABBITMQ_PASSWORD: app
+      RABBITMQ_VHOST: /
+      CELERY_BROKER_URL: ""
+      CELERY_RESULT_BACKEND: ""
+    depends_on:
+      db:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    command: ["-m", "celery", "-A", "app.celery_app.app:celery_app", "worker", "--loglevel=info", "-Q", "default"]
     networks:
       - local-net
 
@@ -65,3 +128,4 @@ networks:
 volumes:
   db-data-local:
   redis-data-local:
+  rabbitmq-data-local:

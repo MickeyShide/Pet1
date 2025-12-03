@@ -8,11 +8,14 @@ bcrypt==4.0.1
 certifi==2025.11.12
 click==8.3.1
 colorama==0.4.6
+celery==5.4.0
 dnspython==2.8.0
 ecdsa==0.19.1
 email-validator==2.3.0
 Faker==38.2.0
 fastapi==0.122.0
+amqp==5.2.0
+kombu==5.3.4
 fakeredis==2.23.3
 greenlet==3.2.4
 h11==0.16.0
