@@ -9,6 +9,8 @@ from app.schemas.timeslot import STimeSlotOut, STimeSlotFilters
 from app.services.booking import BookingService
 from app.services.business.base import BaseBusinessService
 from app.services.timeslot import TimeSlotService
+from app.utils.cache import CacheService
+from app.utils.cache import keys as cache_keys
 
 
 class BookingsBusinessService(BaseBusinessService):
@@ -26,7 +28,7 @@ class BookingsBusinessService(BaseBusinessService):
             total_price=timeslot.base_price,
             expires_at=datetime.now(UTC) + timedelta(minutes=15),
         )
-
+        await CacheService().delete_pattern(cache_keys.timeslots_room_prefix(timeslot.room_id))
         return SBookingOutAfterCreate.from_model(new_booking)
 
     @new_session()
@@ -67,8 +69,11 @@ class BookingsBusinessService(BaseBusinessService):
 
     @new_session()
     async def cancel_booking(self, booking_id: int) -> bool:
+        booking: Booking = await self.booking_service.get_one_by_id(booking_id)
+        await CacheService().delete_pattern(cache_keys.timeslots_room_prefix(booking.room_id))
         return await self.booking_service.cancel_booking(
             booking_id=booking_id,
             user_id=self.user_id,
             is_admin=self.admin
         )
+
