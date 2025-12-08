@@ -27,7 +27,8 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=[],
+        allow_origin_regex=r"http://localhost:\d+$",  # любой порт на localhost
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

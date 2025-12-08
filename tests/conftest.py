@@ -124,3 +124,18 @@ def _stop_dotenv_patch():
     yield
     dotenv_patch.stop()
     psettings_patch.stop()
+
+
+@pytest.fixture(autouse=True)
+def _mock_celery_apply_async(monkeypatch):
+    """
+    Avoid real broker connections during tests; make expire_booking scheduling a no-op.
+    Tests that need to assert scheduling can override this monkeypatch locally.
+    """
+    try:
+        import app.services.business.bookings as bookings_module
+    except Exception:
+        return
+
+    if hasattr(bookings_module, "expire_booking"):
+        monkeypatch.setattr(bookings_module.expire_booking, "apply_async", lambda *args, **kwargs: None)

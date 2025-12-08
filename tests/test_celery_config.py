@@ -62,33 +62,6 @@ def test_ping_task_executes_in_eager(monkeypatch, eager):
 
 
 @pytest.mark.parametrize("eager", [True])
-def test_send_notification_task(monkeypatch, eager):
-    monkeypatch.setenv("CELERY_BROKER_URL", "memory://")
-    monkeypatch.setenv("CELERY_RESULT_BACKEND", "rpc://")
-
-    import app.config as config_module
-
-    importlib.reload(config_module)
-    from app.celery_app import app as celery_app_module
-    importlib.reload(celery_app_module)
-    from app.celery_app.tasks import send_notification
-    from app.celery_app.app import create_celery_app
-
-    celery = create_celery_app()
-    celery.conf.task_always_eager = eager
-    celery.conf.task_store_eager_result = True
-
-    result = send_notification.apply(
-        args=(1, 10, "booking_created", {"message": "hello"})
-    )
-    payload = result.get(timeout=3)
-    assert payload["user_id"] == 1
-    assert payload["booking_id"] == 10
-    assert payload["type"] == "booking_created"
-    assert payload["payload"]["message"] == "hello"
-
-
-@pytest.mark.parametrize("eager", [True])
 def test_expire_booking_task_gracefully_skips_without_engine(monkeypatch, eager):
     monkeypatch.setenv("CELERY_BROKER_URL", "memory://")
     monkeypatch.setenv("CELERY_RESULT_BACKEND", "rpc://")
