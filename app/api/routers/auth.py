@@ -4,7 +4,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from app.api.deps import UserDepends
-from app.schemas.auth import STokenOut, SLogin, SRegister
+from app.schemas.auth import SLoginOut, SLogin, SRegister
 from app.schemas.user import SUserOut
 from app.services.business.auth import AuthBusinessService
 
@@ -22,19 +22,19 @@ async def register_route(user_data: SRegister) -> SUserOut:
 
 @router.post(
     path='/login',
-    response_model=STokenOut,
+    response_model=SLoginOut,
     status_code=status.HTTP_200_OK,
     description="Login a user", )
-async def login_route(request: Request, response: Response, login_data: SLogin) -> STokenOut:
+async def login_route(request: Request, response: Response, login_data: SLogin) -> SLoginOut:
     return await AuthBusinessService().login(request, response, login_data)
 
 
 @router.post(
     path='/refresh',
-    response_model=STokenOut,
+    response_model=SLoginOut,
     status_code=status.HTTP_200_OK,
     description="Refresh tokens by refresh_token", )
-async def refresh_route(request: Request, response: Response) -> STokenOut:
+async def refresh_route(request: Request, response: Response) -> SLoginOut:
     return await AuthBusinessService().refresh(request, response)
 
 

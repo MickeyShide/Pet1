@@ -6,7 +6,7 @@ from app.config import settings
 from app.db.base import new_session
 from app.models import User
 from app.models.user import UserRole
-from app.schemas.auth import SRegister, SLogin, STokenOut, SAccessToken, SRefreshToken
+from app.schemas.auth import SRegister, SLogin, SLoginOut, SAccessToken, SRefreshToken
 from app.schemas.user import SUserOut
 from app.services.business.base import BaseBusinessService
 from app.services.user import UserService
@@ -64,7 +64,7 @@ class AuthBusinessService(BaseBusinessService):
         return SUserOut.from_model(result)
 
     @new_session()
-    async def login(self, request: Request, response: Response, login_data: SLogin) -> STokenOut:
+    async def login(self, request: Request, response: Response, login_data: SLogin) -> SLoginOut:
         cache = CacheService()
         ip: str | None = request.headers.get("X-Real-IP")
         cache_key = cache_keys.login_ip(ip)
@@ -79,12 +79,16 @@ class AuthBusinessService(BaseBusinessService):
 
         access_token, refresh_token = self._generate_tokens_and_cookie(response=response, user=user)
 
-        return STokenOut(
-            access_token=access_token
+        return SLoginOut(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            email=user.email,
+            username=user.username,
+            role=user.role,
         )
 
     @new_session()
-    async def refresh(self, request: Request, response: Response) -> STokenOut:
+    async def refresh(self, request: Request, response: Response) -> SLoginOut:
         refresh_token = request.cookies.get("refresh_token")
         if not refresh_token:
             raise UnauthorizedException("Missing refresh token")
@@ -98,8 +102,12 @@ class AuthBusinessService(BaseBusinessService):
 
         access_token, refresh_token = self._generate_tokens_and_cookie(response=response, user=user)
 
-        return STokenOut(
-            access_token=access_token
+        return SLoginOut(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            email=user.email,
+            username=user.username,
+            role=user.role,
         )
 
     @new_session()

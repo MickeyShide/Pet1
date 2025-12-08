@@ -1,5 +1,6 @@
 from pydantic import EmailStr
 
+from app.models.user import UserRole
 from app.schemas import BaseSchema
 from app.schemas.user import SUserBase
 
@@ -23,5 +24,9 @@ class SRefreshToken(BaseSchema):
     sub: str
 
 
-class STokenOut(BaseSchema):
+class SLoginOut(BaseSchema):
     access_token: str
+    refresh_token: str
+    email: EmailStr
+    username: str
+    role: UserRole
