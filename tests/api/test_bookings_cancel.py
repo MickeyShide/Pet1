@@ -205,7 +205,7 @@ async def test__cancel_booking_endpoint__allows_rebooking_same_slot(async_client
     assert booking.status == BookingStatus.CANCELED
 
     rebook_response = await async_client.post(
-        "/bookings/",
+        "/bookings",
         json={"timeslot_id": slot.id},
         headers={"Authorization": "Bearer test"},
     )

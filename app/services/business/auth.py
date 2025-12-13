@@ -50,10 +50,9 @@ class AuthBusinessService(BaseBusinessService):
             value=refresh_token,
             httponly=True,
             secure=settings.COOKIE_SECURE,
-            samesite="none",
+            samesite="lax",
             max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-            # TODO sdelat'
-            # path=self._refresh_cookie_path(),
+            path="/auth/refresh",
         )
 
         return access_token, refresh_token
@@ -65,9 +64,11 @@ class AuthBusinessService(BaseBusinessService):
 
     @new_session()
     async def login(self, request: Request, response: Response, login_data: SLogin) -> SLoginOut:
+        ip_header = request.headers.get("X-Real-IP") or request.headers.get("X-Forwarded-For")
+        client_ip = (ip_header.split(",")[0].strip() if ip_header else (request.client.host if request.client else "unknown")) or "unknown"
+
         cache = CacheService()
-        ip: str | None = request.headers.get("X-Real-IP")
-        cache_key = cache_keys.login_ip(ip)
+        cache_key = cache_keys.login_ip(client_ip)
         cached = await cache.try_get(cache_key)
         if cached is not None:
             await cache.try_set(cache_key, cached + 1, ttl=self._antifraud_ttl_seconds)
@@ -75,6 +76,7 @@ class AuthBusinessService(BaseBusinessService):
                 raise TooManyAttempts()
         else:
             await cache.try_set(cache_key, 1, ttl=self._antifraud_ttl_seconds)
+
         user: User = await self.user_service.login(login_data)
 
         access_token, refresh_token = self._generate_tokens_and_cookie(response=response, user=user)

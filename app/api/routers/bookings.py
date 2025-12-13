@@ -16,7 +16,7 @@ router = APIRouter(prefix="/bookings", tags=["Bookings"])
 
 
 @router.post(
-    path="/",
+    path="",
     status_code=status.HTTP_201_CREATED,
     response_model=SBookingOutAfterCreate,
     description="Create a new booking",
@@ -29,7 +29,7 @@ async def create_booking_route(
 
 
 @router.get(
-    path="/",
+    path="",
     status_code=status.HTTP_200_OK,
     response_model=List[SBookingOutWithTimeslots],
     description="Get all user bookings with optional filters", )

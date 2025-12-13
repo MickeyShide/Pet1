@@ -39,7 +39,7 @@ async def test__create_booking_route__creates_booking(async_client, db_session, 
     )
     await db_session.commit()
 
-    response = await async_client.post("/bookings/", json={"timeslot_id": slot.id})
+    response = await async_client.post("/bookings", json={"timeslot_id": slot.id})
 
     async_client.app_ref.dependency_overrides.clear()
     assert response.status_code == 201, response.text
@@ -83,7 +83,7 @@ async def test__get_all_user_bookings__applies_status_filter(async_client, db_se
     )
     await db_session.commit()
 
-    response = await async_client.get("/bookings/?status=PAID")
+    response = await async_client.get("/bookings?status=PAID")
 
     async_client.app_ref.dependency_overrides.clear()
     assert response.status_code == 200, response.text
@@ -94,7 +94,7 @@ async def test__get_all_user_bookings__applies_status_filter(async_client, db_se
 
 @pytest.mark.asyncio
 async def test__create_booking_route__requires_auth(async_client):
-    response = await async_client.post("/bookings/", json={"timeslot_id": 1})
+    response = await async_client.post("/bookings", json={"timeslot_id": 1})
     assert response.status_code == 401
 
 
@@ -104,7 +104,7 @@ async def test__create_booking_route__missing_timeslot_id_returns_422(async_clie
     token = SAccessToken(sub=str(user.id), admin=False)
     override_token_dependency(async_client.app_ref, token)
 
-    response = await async_client.post("/bookings/", json={})
+    response = await async_client.post("/bookings", json={})
 
     async_client.app_ref.dependency_overrides.clear()
     assert response.status_code == 422
@@ -116,7 +116,7 @@ async def test__create_booking_route__invalid_timeslot_id_returns_422(async_clie
     token = SAccessToken(sub=str(user.id), admin=False)
     override_token_dependency(async_client.app_ref, token)
 
-    response = await async_client.post("/bookings/", json={"timeslot_id": "abc"})
+    response = await async_client.post("/bookings", json={"timeslot_id": "abc"})
 
     async_client.app_ref.dependency_overrides.clear()
     assert response.status_code == 422
@@ -129,7 +129,7 @@ async def test__create_booking_route__timeslot_not_found_returns_404(async_clien
     override_token_dependency(async_client.app_ref, token)
     await db_session.commit()
 
-    response = await async_client.post("/bookings/", json={"timeslot_id": 9999})
+    response = await async_client.post("/bookings", json={"timeslot_id": 9999})
 
     async_client.app_ref.dependency_overrides.clear()
     assert response.status_code == 404
@@ -137,7 +137,7 @@ async def test__create_booking_route__timeslot_not_found_returns_404(async_clien
 
 @pytest.mark.asyncio
 async def test__get_user_bookings_requires_auth(async_client):
-    response = await async_client.get("/bookings/")
+    response = await async_client.get("/bookings")
     assert response.status_code == 401
 
 
@@ -163,7 +163,7 @@ async def test__create_booking_route__fails_when_slot_taken(async_client, db_ses
     )
     await db_session.commit()
 
-    response = await async_client.post("/bookings/", json={"timeslot_id": slot.id})
+    response = await async_client.post("/bookings", json={"timeslot_id": slot.id})
 
     async_client.app_ref.dependency_overrides.clear()
     assert response.status_code == 409
@@ -176,7 +176,7 @@ async def test__get_user_bookings__returns_empty_list_when_none(async_client, db
     token = SAccessToken(sub=str(user.id), admin=False)
     override_token_dependency(async_client.app_ref, token)
 
-    response = await async_client.get("/bookings/", headers={"Authorization": "Bearer test"})
+    response = await async_client.get("/bookings", headers={"Authorization": "Bearer test"})
 
     async_client.app_ref.dependency_overrides.clear()
     assert response.status_code == 200, response.text
@@ -207,7 +207,7 @@ async def test__get_user_bookings__filters_by_room_id(async_client, db_session, 
     target_booking = await create_booking(db_session, user=user, room=room_b, timeslot=slot_b)
     await db_session.commit()
 
-    response = await async_client.get(f"/bookings/?room_id={room_b.id}")
+    response = await async_client.get(f"/bookings?room_id={room_b.id}")
 
     async_client.app_ref.dependency_overrides.clear()
     assert response.status_code == 200, response.text
@@ -244,7 +244,7 @@ async def test__get_user_bookings__filters_by_timeslot_range(async_client, db_se
         "end_datetime": (slot_in_range.end_datetime + timedelta(minutes=5)).isoformat(),
     }
 
-    response = await async_client.get("/bookings/", params=params)
+    response = await async_client.get("/bookings", params=params)
 
     async_client.app_ref.dependency_overrides.clear()
     assert response.status_code == 200, response.text
@@ -259,7 +259,7 @@ async def test__get_all_user_bookings__invalid_status_returns_422(async_client, 
     token = SAccessToken(sub=str(user.id), admin=False)
     override_token_dependency(async_client.app_ref, token)
 
-    response = await async_client.get("/bookings/?status=INVALID")
+    response = await async_client.get("/bookings?status=INVALID")
 
     async_client.app_ref.dependency_overrides.clear()
     assert response.status_code == 422

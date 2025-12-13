@@ -13,7 +13,7 @@ router = APIRouter(prefix="/locations", tags=["Locations"])
 
 
 @router.get(
-    path='/',
+    path='',
     response_model=List[SLocationOut],
     status_code=status.HTTP_200_OK,
     description="Return all locations", )
@@ -31,7 +31,7 @@ async def get_location_by_id_route(location_id: int) -> SLocationOut:
 
 
 @router.post(
-    path='/',
+    path='',
     response_model=SLocationOut,
     status_code=status.HTTP_200_OK,
     description="Create new location", )

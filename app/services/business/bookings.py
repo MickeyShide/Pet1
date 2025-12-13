@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, UTC
 from typing import List, Tuple
 
 from app.celery_app.tasks import expire_booking
+from app.config import settings
 from app.db.base import new_session
 from app.models import Booking, TimeSlot
 from app.schemas.booking import (
@@ -23,7 +24,6 @@ from app.utils.cache import keys as cache_keys
 class BookingsBusinessService(BaseBusinessService):
     booking_service: BookingService
     timeslot_service: TimeSlotService
-    _logger = logging.getLogger(__name__)
 
     @new_session()
     async def create_booking(self, booking_data: SBookingCreate) -> SBookingOutAfterCreate:
@@ -34,7 +34,7 @@ class BookingsBusinessService(BaseBusinessService):
             room_id=timeslot.room_id,
             timeslot_id=timeslot.id,
             total_price=timeslot.base_price,
-            expires_at=datetime.now(UTC) + timedelta(minutes=15),
+            expires_at=datetime.now(UTC) + timedelta(seconds=settings.BOOKING_EXPIRE_SECONDS),
         )
         try:
             expire_booking.apply_async(args=[new_booking.id], eta=new_booking.expires_at)

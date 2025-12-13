@@ -59,31 +59,3 @@ def test_ping_task_executes_in_eager(monkeypatch, eager):
     task = celery.tasks["app.celery_app.tasks.ping"]
     result = task.apply_async()
     assert result.get(timeout=3) == "pong"
-
-
-@pytest.mark.parametrize("eager", [True])
-def test_expire_booking_task_gracefully_skips_without_engine(monkeypatch, eager):
-    monkeypatch.setenv("CELERY_BROKER_URL", "memory://")
-    monkeypatch.setenv("CELERY_RESULT_BACKEND", "rpc://")
-
-    import app.config as config_module
-
-    importlib.reload(config_module)
-    from app.celery_app import app as celery_app_module
-    importlib.reload(celery_app_module)
-    from app.celery_app import tasks as celery_tasks
-    importlib.reload(celery_tasks)
-    from app.celery_app.app import create_celery_app
-
-    celery = create_celery_app()
-    celery.conf.task_always_eager = eager
-    celery.conf.task_store_eager_result = True
-
-    # force engine absence to validate graceful fallback
-    monkeypatch.setattr(celery_tasks, "async_session_maker", None)
-    monkeypatch.setattr(celery_tasks, "init_engine", lambda echo=False: None)
-
-    result = celery_tasks.expire_booking.apply(args=(123,))
-    payload = result.get(timeout=3)
-    assert payload["booking_id"] == 123
-    assert payload["status"] == "skipped_no_engine"

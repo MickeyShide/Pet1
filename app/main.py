@@ -6,12 +6,13 @@ from starlette.requests import Request
 
 from app.api import routers
 from app.db.base import init_engine, dispose_engine
+from app.config import settings
 from app.utils.redis import init_redis, close_redis
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_engine(echo=True)
+    init_engine(echo=settings.SQL_ECHO)
     await init_redis(app)
     try:
         yield
@@ -27,8 +28,8 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[],
-        allow_origin_regex=r"http://localhost:\d+$",  # любой порт на localhost
+        allow_origins=settings.CORS_ALLOW_ORIGINS,
+        allow_origin_regex=settings.CORS_ALLOW_ORIGIN_REGEX,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

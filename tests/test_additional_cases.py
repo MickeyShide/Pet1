@@ -55,46 +55,6 @@ async def test_get_token_data_missing_fields():
 
 # ---------------- Auth business ----------------
 
-
-@pytest.mark.asyncio
-async def test_auth_login_increments_counter_without_ip(monkeypatch):
-    class FakeCache:
-        def __init__(self, *_, **__):
-            self.set_calls = []
-
-        async def try_get(self, key):
-            return None
-
-        async def try_set(self, key, value, ttl=None):
-            self.set_calls.append((key, value, ttl))
-
-    cache = FakeCache()
-    monkeypatch.setattr("app.services.business.auth.CacheService", lambda *a, **k: cache)
-
-    service = AuthBusinessService()
-
-    async def fake_login(data):
-        return types.SimpleNamespace(
-            id=1,
-            role=None,
-            first_name="A",
-            second_name="B",
-            email="a@b.com",
-            username="user1",
-        )
-
-    service.user_service = types.SimpleNamespace(login=fake_login)
-
-    request = Request({"type": "http", "headers": [], "client": ("127.0.0.1", 0)})
-    response = Response()
-
-    await service.login(request, response, SLogin(email="a@b.com", password="pwd"))
-
-    assert cache.set_calls  # counter was written
-    assert cache.set_calls[0][0] == "login:None"
-    assert cache.set_calls[0][1] == 1
-
-
 @pytest.mark.asyncio
 async def test_auth_login_blocks_on_too_many(monkeypatch):
     class FakeCache:

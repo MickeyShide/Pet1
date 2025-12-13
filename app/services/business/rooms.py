@@ -4,6 +4,7 @@ from app.db.base import new_session
 from app.models import Room
 from app.schemas.room import SRoomOut, SRoomCreate, SRoomUpdate
 from app.schemas.timeslot import STimeSlotDateRange, STimeSlotOutWithBookingStatus, STimeSlotCreate, STimeSlotOut
+from app.config import settings
 from app.services.business.base import BaseBusinessService
 from app.services.location import LocationService
 from app.services.room import RoomService
@@ -16,8 +17,6 @@ class RoomBusinessService(BaseBusinessService):
     location_service: LocationService
     room_service: RoomService
     timeslots_service: TimeSlotService
-
-    _timeslot_cache_ttl_seconds: int = 30
 
     @new_session()
     async def create_by_location_id(self, location_id: int, room_data: SRoomCreate) -> SRoomOut:
@@ -71,7 +70,11 @@ class RoomBusinessService(BaseBusinessService):
                 for slot, has_active_booking in timeslots_with_booking
             ]
             # CACHE! Key: timeslots:{room_id}:{date_from}:{date_to} TTL: 30s
-            await cache.try_set(cache_key, timeslot_dicts, ttl=self._timeslot_cache_ttl_seconds)
+            await cache.try_set(
+                cache_key,
+                timeslot_dicts,
+                ttl=settings.TIMESLOT_CACHE_TTL_SECONDS,
+            )
 
         return timeslot_dicts
 

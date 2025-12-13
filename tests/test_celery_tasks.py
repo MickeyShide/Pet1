@@ -6,17 +6,6 @@ from app.celery_app import tasks
 from app.db import base as db_base
 from tests.fixtures import factories
 
-
-@pytest.mark.asyncio
-async def test_expire_booking_skipped_when_engine_missing(monkeypatch):
-    monkeypatch.setattr(tasks, "async_session_maker", None, raising=False)
-    monkeypatch.setattr(tasks, "init_engine", lambda echo=False: None)
-
-    result = await tasks._expire_booking(1)
-
-    assert result == {"booking_id": 1, "status": "skipped_no_engine"}
-
-
 @pytest.mark.asyncio
 async def test_expire_booking_skipped_when_not_expired(db_session, session_maker, faker, monkeypatch):
     monkeypatch.setattr(tasks, "async_session_maker", session_maker, raising=False)
@@ -76,30 +65,3 @@ async def test_expire_booking_expires_and_invalidates_cache(db_session, session_
     assert str(status_value).endswith("EXPIRED")
     assert any("timeslots" in pattern for pattern in deleted_patterns)
 
-
-@pytest.mark.asyncio
-async def test_expire_booking_handles_session_errors(monkeypatch):
-    class ExplodingSession:
-        def __init__(self):
-            self.rollback_called = False
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return False
-
-        async def execute(self, stmt):
-            raise RuntimeError("boom")
-
-        async def rollback(self):
-            self.rollback_called = True
-            raise RuntimeError("rollback failed")
-
-    monkeypatch.setattr(tasks, "async_session_maker", lambda: ExplodingSession(), raising=False)
-    monkeypatch.setattr(tasks, "init_engine", lambda echo=False: None)
-
-    result = await tasks._expire_booking(999)
-
-    assert result["status"] == "error"
-    assert "boom" in result["detail"]

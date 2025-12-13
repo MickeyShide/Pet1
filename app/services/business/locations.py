@@ -2,6 +2,7 @@ from typing import List
 
 from app.db.base import new_session
 from app.models import Location, Room
+from app.config import settings
 from app.schemas.location import SLocationOut, SLocationCreate, SLocationUpdate
 from app.schemas.room import SRoomOut
 from app.services.business.base import BaseBusinessService
@@ -14,8 +15,6 @@ class LocationBusinessService(BaseBusinessService):
     location_service: LocationService
     room_service: RoomService
 
-    _location_tll_seconds: int = 6
-
     @new_session(readonly=True)
     async def get_all(self) -> list[SLocationOut]:
 
@@ -27,7 +26,7 @@ class LocationBusinessService(BaseBusinessService):
 
         locations: List[Location] = await self.location_service.get_all()
         retult: list[SLocationOut] = [SLocationOut.from_model(location) for location in locations]
-        await cache.try_set(cache_key, retult, ttl=self._location_tll_seconds)
+        await cache.try_set(cache_key, retult, ttl=settings.LOCATION_CACHE_TTL_SECONDS)
 
         return retult
 

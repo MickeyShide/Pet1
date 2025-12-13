@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import update
 
 from app.celery_app.app import celery_app
-from app.db.base import async_session_maker, init_engine
+from app.db import base as db_base
 from app.models.booking import Booking, BookingStatus
 from app.utils.cache.cache_service import CacheService
 from app.utils.cache import keys as cache_keys
@@ -20,13 +20,13 @@ async def _expire_booking(booking_id: int) -> dict[str, Any]:
     - invalidate timeslot cache for the room
     - enqueue notification
     """
-    if async_session_maker is None:
-        init_engine(echo=False)
+    if db_base.async_session_maker is None:
+        db_base.init_engine(echo=False)
 
-    if async_session_maker is None:
+    if db_base.async_session_maker is None:
         return {"booking_id": booking_id, "status": "skipped_no_engine"}
 
-    async with async_session_maker() as session:
+    async with db_base.async_session_maker() as session:
         try:
             stmt = (
                 update(Booking)
@@ -39,6 +39,7 @@ async def _expire_booking(booking_id: int) -> dict[str, Any]:
             res = await session.execute(stmt)
             row = res.one_or_none()
             if row is None:
+                print("FOUND NOTHING")
                 await session.rollback()
                 return {"booking_id": booking_id, "status": "skipped_not_pending_or_not_expired"}
 
@@ -62,4 +63,7 @@ def expire_booking(booking_id: int) -> dict[str, Any]:
     """
     Celery entrypoint for expiring bookings according to the spec.
     """
-    return asyncio.run(_expire_booking(booking_id))
+    print(f"[expire_booking] running task for booking_id={booking_id}", flush=True)
+    payload = asyncio.run(_expire_booking(booking_id))
+    print(f"[expire_booking] finished booking_id={booking_id} -> {payload}", flush=True)
+    return payload

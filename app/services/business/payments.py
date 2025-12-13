@@ -44,6 +44,6 @@ class PaymentBusinessService(BaseBusinessService):
             raise PaymentNotFound()
 
         updated_payment: Payment = await self.payment_service.update_by_id(payment_id, status=PaymentStatus.SUCCESS)
-        updated_booking: Booking = await self.booking_service.set_booking_paid(updated_payment.booking_id)
+        await self.booking_service.set_booking_paid(updated_payment.booking_id)
 
-        return SPaymentOut.from_model(payment)
+        return SPaymentOut.from_model(updated_payment)

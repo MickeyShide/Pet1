@@ -36,7 +36,7 @@ async def test__create_location_requires_admin(async_client, db_session, faker):
         "description": "HQ office",
     }
 
-    response = await async_client.post("/locations/", json=payload, headers={"Authorization": "Bearer test"})
+    response = await async_client.post("/locations", json=payload, headers={"Authorization": "Bearer test"})
 
     async_client.app_ref.dependency_overrides.clear()
     assert response.status_code == 403, response.text
@@ -51,7 +51,7 @@ async def test__create_location_with_admin(async_client, db_session, faker):
         "description": "HQ office",
     }
 
-    response = await async_client.post("/locations/", json=payload, headers={"Authorization": "Bearer test"})
+    response = await async_client.post("/locations", json=payload, headers={"Authorization": "Bearer test"})
 
     async_client.app_ref.dependency_overrides.clear()
     assert response.status_code == 200, response.text
@@ -111,7 +111,7 @@ async def test__get_all_locations_returns_all(async_client, db_session, faker):
     loc_b = await create_location(db_session, faker)
     await db_session.commit()
 
-    response = await async_client.get("/locations/")
+    response = await async_client.get("/locations")
 
     assert response.status_code == 200
     names = {item["name"] for item in response.json()}
