@@ -73,7 +73,6 @@ services:
       RABBITMQ_VHOST: /
       CELERY_BROKER_URL: ""
       CELERY_RESULT_BACKEND: ""
-      CORS_ALLOW_ORIGINS: ["https://itouch-pet-project.ru.tuna.am"]
     ports:
       - "4004:4000"
     depends_on:
