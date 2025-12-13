@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     COOKIE_SECURE: bool = True
-    CORS_ALLOW_ORIGINS: list[str] = []
+    CORS_ALLOW_ORIGINS: list[str] = ['https://itouch-pet-project.ru.tuna.am']
     CORS_ALLOW_ORIGIN_REGEX: str | None = r"http://localhost:\d+$"
 
     # Redis
