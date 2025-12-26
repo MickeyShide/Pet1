@@ -1,5 +1,3 @@
-from datetime import datetime, timedelta, timezone
-
 import pytest
 from sqlalchemy import select
 
@@ -7,7 +5,6 @@ from app.api import deps
 from app.schemas.auth import SAccessToken
 from app.utils.err.base.forbidden import ForbiddenException
 from app.models import Location, Room
-from app.schemas.location import SLocationCreate
 from tests.fixtures.factories import (
     create_location,
     create_room,

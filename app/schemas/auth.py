@@ -1,6 +1,5 @@
 from pydantic import EmailStr
 
-from app.models.user import UserRole
 from app.schemas import BaseSchema
 from app.schemas.user import SUserBase, SUserOut
 

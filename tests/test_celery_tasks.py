@@ -3,8 +3,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.celery_app import tasks
-from app.db import base as db_base
 from tests.fixtures import factories
+
 
 @pytest.mark.asyncio
 async def test_expire_booking_skipped_when_not_expired(db_session, session_maker, faker, monkeypatch):
@@ -64,4 +64,3 @@ async def test_expire_booking_expires_and_invalidates_cache(db_session, session_
     status_value = result["status"]
     assert str(status_value).endswith("EXPIRED")
     assert any("timeslots" in pattern for pattern in deleted_patterns)
-

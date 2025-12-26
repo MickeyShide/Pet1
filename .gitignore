@@ -1,4 +1,7 @@
 /app/.env
+/.env
+/.venv/
+/.idea/
 .idea/.gitignore
 .idea/FastAPI_pet_1.iml
 .idea/misc.xml

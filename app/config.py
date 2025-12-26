@@ -39,7 +39,10 @@ class Settings(BaseSettings):
     TIMESLOT_CACHE_TTL_SECONDS: int = 30
 
     model_config = SettingsConfigDict(
-        env_file=f"{Path(__file__).resolve().parent}/.env",  # откуда читать
+        env_file=(
+            Path(__file__).resolve().parent.parent / ".env",  # project root
+            Path(__file__).resolve().parent / ".env",  # legacy location
+        ),
         env_file_encoding="utf-8",
         extra="ignore",
     )

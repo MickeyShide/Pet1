@@ -57,7 +57,7 @@ class BaseService(Generic[T], ABC):
             return await self._repository.get_first(**filters)
         except NoResultFound:
             raise NotFoundException(
-                detail=f'no_items_found_by_filters'
+                detail="no_items_found_by_filters"
             )
 
     async def get_all(self, offset: int | None = None, limit: int | None = None) -> List[T]:

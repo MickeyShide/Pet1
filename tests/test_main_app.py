@@ -59,7 +59,7 @@ async def test_lifespan_calls_init_and_cleanup(monkeypatch):
 
     app = FastAPI(lifespan=main.lifespan)
     async with main.lifespan(app):
-        assert "init_engine:True" in calls
+        assert f"init_engine:{main.settings.SQL_ECHO}" in calls
         assert "init_redis" in calls
 
     assert "close_redis" in calls

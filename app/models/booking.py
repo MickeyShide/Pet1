@@ -40,7 +40,7 @@ class Booking(BaseSQLModel, table=True):
             "timeslot_id",
             unique=True,
             postgresql_where=text(
-                f"status IN ('PENDING_PAYMENTS', 'PAID')"
+                "status IN ('PENDING_PAYMENTS', 'PAID')"
             ),
         ),
     )

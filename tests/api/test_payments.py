@@ -52,7 +52,6 @@ async def test__confirm_payment_route__owner_success_updates_booking(async_clien
         status=BookingStatus.PENDING_PAYMENTS,
         expires_delta=timedelta(hours=2),  # expired to let set_booking_paid pass
     )
-    print(booking)
     payment = await PaymentRepository(db_session).create(booking_id=booking.id, external_id="ext-123")
     await db_session.commit()
 

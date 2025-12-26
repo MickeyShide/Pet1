@@ -51,7 +51,7 @@ def get_real_ip(request: Request) -> str:
     if real_ip:
         return real_ip.strip()
 
-    return request.client.host
+    return request.client.host if request.client else "unknown"
 
 
 @app.get("/debug/ip")

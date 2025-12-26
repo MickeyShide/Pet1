@@ -82,12 +82,15 @@ class BookingRepository(BaseRepository[Booking]):
             .where(self._model_cls.status == BookingStatus.PENDING_PAYMENTS)
             .where(self._model_cls.expires_at > datetime.now(timezone.utc))
             .values(status=BookingStatus.PAID, paid_at=datetime.now(timezone.utc))
+            .execution_options(synchronize_session=False)
             .returning(self._model_cls)
         )
 
         res = await self.session.execute(stmt)
 
-        return res.one()[0]
+        booking = res.scalar_one()
+        await self.session.refresh(booking)
+        return booking
 
     async def cancel_booking(self, booking_id: int, user_id: int, is_admin: bool) -> Booking:
         stmt = (
@@ -98,6 +101,7 @@ class BookingRepository(BaseRepository[Booking]):
                 status=BookingStatus.CANCELED,
                 canceled_at=datetime.now(timezone.utc),
             )
+            .execution_options(synchronize_session=False)
             .returning(self._model_cls)
         )
 
@@ -106,4 +110,6 @@ class BookingRepository(BaseRepository[Booking]):
 
         res = await self.session.execute(stmt)
 
-        return res.one()[0]
+        booking = res.scalar_one()
+        await self.session.refresh(booking)
+        return booking

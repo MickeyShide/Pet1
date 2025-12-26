@@ -1,3 +1,4 @@
+import anyio
 from sqlalchemy.exc import IntegrityError
 
 from app.models import User
@@ -15,8 +16,7 @@ class UserService(BaseService[User]):
     _repository = UserRepository
 
     async def create_user(self, user_data: SRegister) -> User:
-        print(user_data)
-        hashed = hash_password(user_data.password)
+        hashed = await anyio.to_thread.run_sync(hash_password, user_data.password)
 
         payload = user_data.model_dump(exclude={"password"})
         payload["hashed_password"] = hashed
@@ -41,8 +41,11 @@ class UserService(BaseService[User]):
         except NotFoundException:
             raise UnauthorizedException("Wrong email or password")
 
-        if verify_password(plain_password=login_data.password,
-                           hashed_password=user.hashed_password):
+        ok = await anyio.to_thread.run_sync(
+            verify_password,
+            login_data.password,
+            user.hashed_password,
+        )
+        if ok:
             return user
-        else:
-            raise UnauthorizedException("Wrong email or password")
+        raise UnauthorizedException("Wrong email or password")

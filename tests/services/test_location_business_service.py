@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy import select
 
-from app.models import Location, Room
+from app.models import Location
 from app.services.business.locations import LocationBusinessService
 from app.schemas.location import SLocationCreate, SLocationUpdate
 from tests.fixtures.factories import (

@@ -9,8 +9,7 @@ from starlette.responses import Response
 from app.models import Booking
 from app.models.booking import BookingStatus
 from app.models.location import Location
-from app.models.user import User, UserRole
-from app.schemas.auth import SAccessToken, SLogin
+from app.schemas.auth import SLogin
 from app.schemas.location import SLocationOut
 from app.services.booking import BookingService
 from app.services.business.auth import AuthBusinessService

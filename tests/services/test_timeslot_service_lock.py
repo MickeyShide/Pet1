@@ -17,7 +17,7 @@ from tests.fixtures.factories import (
 @pytest.mark.asyncio
 async def test__lock_time_slot_for_booking__returns_slot_if_available(db_session, faker):
     # Given
-    user = await create_user(db_session, faker)
+    await create_user(db_session, faker)
     location = await create_location(db_session, faker)
     room = await create_room(db_session, faker, location=location)
     start = datetime.now(timezone.utc)

@@ -84,11 +84,18 @@ class BaseRepository(Generic[T], ABC):
         :param data:
         :return:
         """
-        query = update(self._model_cls).where(self._model_cls.id == _id).values(**data).returning(self._model_cls)
+        query = (
+            update(self._model_cls)
+            .where(self._model_cls.id == _id)
+            .values(**data)
+            .execution_options(synchronize_session=False)
+            .returning(self._model_cls)
+        )
         result = await self.session.execute(query)
         updated = result.scalar_one_or_none()
         if updated is None:
             raise NoResultFound
+        await self.session.refresh(updated)
         return updated
 
     async def get_first(self, **filters) -> T:

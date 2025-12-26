@@ -39,7 +39,6 @@ async def _expire_booking(booking_id: int) -> dict[str, Any]:
             res = await session.execute(stmt)
             row = res.one_or_none()
             if row is None:
-                print("FOUND NOTHING")
                 await session.rollback()
                 return {"booking_id": booking_id, "status": "skipped_not_pending_or_not_expired"}
 
@@ -63,7 +62,5 @@ def expire_booking(booking_id: int) -> dict[str, Any]:
     """
     Celery entrypoint for expiring bookings according to the spec.
     """
-    print(f"[expire_booking] running task for booking_id={booking_id}", flush=True)
     payload = asyncio.run(_expire_booking(booking_id))
-    print(f"[expire_booking] finished booking_id={booking_id} -> {payload}", flush=True)
     return payload
