@@ -25,5 +25,4 @@ class SRefreshToken(BaseSchema):
 
 class SLoginOut(BaseSchema):
     access_token: str
-    refresh_token: str
     user: SUserOut

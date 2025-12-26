@@ -83,7 +83,6 @@ class AuthBusinessService(BaseBusinessService):
 
         return SLoginOut(
             access_token=access_token,
-            refresh_token=refresh_token,
             user=SUserOut.from_model(user),
         )
 
@@ -104,7 +103,6 @@ class AuthBusinessService(BaseBusinessService):
 
         return SLoginOut(
             access_token=access_token,
-            refresh_token=refresh_token,
             user=SUserOut.from_model(user),
         )
 
