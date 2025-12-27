@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app.models import Room, TimeSlot
 from app.models.booking import BookingStatus
 from app.models.timeslot import TimeSlotStatus
+from app.models.room import TimeSlotType
 from app.schemas.room import SRoomCreate, SRoomUpdate
 from app.schemas.timeslot import STimeSlotCreate, STimeSlotDateRange
 from app.services.business.rooms import RoomBusinessService
@@ -29,6 +30,8 @@ async def test__create_by_location_id__persists_room(db_session, faker):
         capacity=8,
         description="Board room",
         is_active=True,
+        time_slot_type=TimeSlotType.FLEXIBLE,
+        hour_price=150.0,
     )
 
     # When
@@ -39,6 +42,39 @@ async def test__create_by_location_id__persists_room(db_session, faker):
     stmt = select(Room).where(Room.id == result.id)
     stored = (await db_session.execute(stmt)).scalar_one()
     assert stored.location_id == location.id
+    assert stored.hour_price == payload.hour_price
+    assert stored.time_slot_type == payload.time_slot_type
+
+
+@pytest.mark.asyncio
+async def test__get_all_with_location__returns_location_data(db_session, faker):
+    # Given
+    location = await create_location(db_session, faker)
+    room_a = await create_room(db_session, faker, location=location)
+    room_b = await create_room(db_session, faker, location=location)
+    await db_session.commit()
+    service = RoomBusinessService()
+
+    # When
+    result = await service.get_all_with_location()
+
+    # Then
+    ids = {room.id for room in result}
+    assert {room_a.id, room_b.id}.issubset(ids)
+    for room in result:
+        assert room.location.id == location.id
+
+
+@pytest.mark.asyncio
+async def test__get_all_with_location__empty(db_session):
+    # Given
+    service = RoomBusinessService()
+
+    # When
+    result = await service.get_all_with_location()
+
+    # Then
+    assert result == []
 
 
 @pytest.mark.asyncio
@@ -126,6 +162,26 @@ async def test__update_by_id__updates_selected_fields(db_session, faker):
     await db_session.refresh(room)
     assert room.name == payload.name
     assert room.capacity == payload.capacity
+
+
+@pytest.mark.asyncio
+async def test__update_by_id__updates_new_fields(db_session, faker):
+    # Given
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location, hour_price=50)
+    await db_session.commit()
+    service = RoomBusinessService()
+    payload = SRoomUpdate(hour_price=250, time_slot_type=TimeSlotType.FIXED)
+
+    # When
+    result = await service.update_by_id(room.id, payload)
+
+    # Then
+    assert result.hour_price == payload.hour_price
+    assert result.time_slot_type == payload.time_slot_type
+    await db_session.refresh(room)
+    assert room.hour_price == payload.hour_price
+    assert room.time_slot_type == payload.time_slot_type
 
 
 @pytest.mark.asyncio

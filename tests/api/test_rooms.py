@@ -138,6 +138,31 @@ async def test__get_room_by_id_returns_data(async_client, db_session, faker):
 
 
 @pytest.mark.asyncio
+async def test__get_all_rooms_returns_empty(async_client):
+    response = await async_client.get("/rooms")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test__get_all_rooms_returns_locations(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room_a = await create_room(db_session, faker, location=location)
+    room_b = await create_room(db_session, faker, location=location)
+    await db_session.commit()
+
+    response = await async_client.get("/rooms")
+
+    assert response.status_code == 200
+    payload = response.json()
+    ids = {item["id"] for item in payload}
+    assert {room_a.id, room_b.id}.issubset(ids)
+    for item in payload:
+        assert item["location"]["id"] == location.id
+
+
+@pytest.mark.asyncio
 async def test__get_room_timeslots_returns_booking_flags(async_client, db_session, faker):
     user = await create_user(db_session, faker)
     location = await create_location(db_session, faker)

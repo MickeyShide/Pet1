@@ -2,7 +2,7 @@ from typing import List
 
 from app.db.base import new_session
 from app.models import Room
-from app.schemas.room import SRoomOut, SRoomCreate, SRoomUpdate
+from app.schemas.room import SRoomOut, SRoomCreate, SRoomUpdate, SRoomOutWithLocation
 from app.schemas.timeslot import STimeSlotDateRange, STimeSlotOutWithBookingStatus, STimeSlotCreate, STimeSlotOut
 from app.config import settings
 from app.services.business.base import BaseBusinessService
@@ -17,6 +17,11 @@ class RoomBusinessService(BaseBusinessService):
     location_service: LocationService
     room_service: RoomService
     timeslots_service: TimeSlotService
+
+    @new_session(readonly=True)
+    async def get_all_with_location(self) -> list[SRoomOutWithLocation]:
+        rooms = await self.room_service.get_all_with_location()
+        return [SRoomOutWithLocation.from_model(room) for room in rooms]
 
     @new_session()
     async def create_by_location_id(self, location_id: int, room_data: SRoomCreate) -> SRoomOut:
