@@ -7,6 +7,7 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Booking, Location, Room, TimeSlot, User
+from app.models.room import RoomType, TimeSlotType
 from app.models.booking import BookingStatus
 from app.models.timeslot import TimeSlotStatus
 from app.models.user import UserRole
@@ -48,13 +49,23 @@ async def create_room(
     *,
     location: Location,
     is_active: bool = True,
+    hour_price: Decimal | None = None,
+    time_slot_type: TimeSlotType = TimeSlotType.FLEXIBLE,
+    room_type: RoomType | None = None,
+    image_id: int | None = None,
 ) -> Room:
+    if hour_price is None:
+        hour_price = Decimal(faker.random_int(min=0, max=12312))
     room = Room(
         location_id=location.id,
         name=faker.color_name(),
         capacity=faker.random_int(min=1, max=20),
         description=faker.text(max_nb_chars=40),
         is_active=is_active,
+        hour_price=hour_price,
+        time_slot_type=time_slot_type,
+        type=room_type,
+        image_id=image_id,
     )
     session.add(room)
     await session.flush()

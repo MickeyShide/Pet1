@@ -5,11 +5,21 @@ from fastapi import APIRouter, Query
 from starlette import status
 
 from app.api.deps import AdminDepends
-from app.schemas.room import SRoomOut, SRoomUpdate
+from app.schemas.room import SRoomOut, SRoomUpdate, SRoomOutWithLocation
 from app.schemas.timeslot import STimeSlotOut, STimeSlotDateRange, STimeSlotOutWithBookingStatus, STimeSlotCreate
 from app.services.business.rooms import RoomBusinessService
 
 router = APIRouter(prefix="/rooms", tags=["Rooms"])
+
+
+# TODO add pagination
+@router.get(
+    path='',
+    response_model=list[SRoomOutWithLocation],
+    status_code=status.HTTP_200_OK,
+    description="Return all rooms", )
+async def get_all_rooms_route() -> list[SRoomOutWithLocation]:
+    return await RoomBusinessService().get_all_with_location()
 
 
 @router.get(

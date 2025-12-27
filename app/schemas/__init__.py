@@ -2,7 +2,7 @@ from pydantic import BaseModel, ConfigDict
 
 
 class BaseSchema(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
 
     @classmethod
     def from_model(cls, model_obj):
@@ -12,10 +12,4 @@ class BaseSchema(BaseModel):
         - игнорирует лишние поля в ORM (created_at и т.д.)
         - использует pydantic v2 model_validate
         """
-        data = {}
-
-        for field in cls.model_fields:
-            if hasattr(model_obj, field):
-                data[field] = getattr(model_obj, field)
-
-        return cls(**data)
+        return cls.model_validate(model_obj)

@@ -4,6 +4,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    DEBUG: bool = False
+
     # Database
     DATABASE_URL: str  # postgresql+asyncpg://user:pass@host:port/db
     SQL_ECHO: bool = False

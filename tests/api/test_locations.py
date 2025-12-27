@@ -1,7 +1,10 @@
+from decimal import Decimal
+
 import pytest
 from sqlalchemy import select
 
 from app.api import deps
+from app.models.room import TimeSlotType
 from app.schemas.auth import SAccessToken
 from app.utils.err.base.forbidden import ForbiddenException
 from app.models import Location, Room
@@ -65,6 +68,8 @@ async def test__create_room_under_location(async_client, db_session, faker):
         "capacity": 8,
         "description": "Board room",
         "is_active": True,
+        "time_slot_type": TimeSlotType.FIXED.value,
+        "hour_price": "12.5",
     }
     await db_session.commit()
 

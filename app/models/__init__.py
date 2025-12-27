@@ -6,6 +6,8 @@ from .payment import Payment
 from .room import Room
 from .timeslot import TimeSlot
 from .user import User
+from .image import Image
+from .feature import Feature
 
 __all__ = [
     "BaseSQLModel",
@@ -16,4 +18,6 @@ __all__ = [
     "Payment",
     "User",
     "NotificationLog",
+    "Image",
+    "Feature",
 ]

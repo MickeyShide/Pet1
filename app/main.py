@@ -21,6 +21,10 @@ async def lifespan(app: FastAPI):
         await dispose_engine()
 
 
+def add_debug_routes(app: FastAPI) -> None:
+    app.get("/debug/ip")(debug_ip)
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="Pet 1", lifespan=lifespan)
     for r in routers.__all__:
@@ -35,10 +39,10 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    if settings.DEBUG:
+        add_debug_routes(app)
+
     return app
-
-
-app: FastAPI = create_app()
 
 
 def get_real_ip(request: Request) -> str:
@@ -54,14 +58,16 @@ def get_real_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-@app.get("/debug/ip")
-async def debug_ip(request: Request):
+async def debug_ip(request: Request) -> dict[str, str | None]:
     return {
         "X-Real-IP": request.headers.get("X-Real-IP"),
         "X-Forwarded-For": request.headers.get("X-Forwarded-For"),
-        "client": request.client.host,
+        "client": request.client.host if request.client else None,
         "real_ip": get_real_ip(request),
     }
+
+
+app: FastAPI = create_app()
 
 
 if __name__ == "__main__":
