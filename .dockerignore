@@ -1,0 +1,20 @@
+.git
+.idea
+.pytest_cache
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+test_db.sqlite3
+tests/test_db.sqlite3
+tests/__pycache__
+tests/.pytest_cache
+
+# local env files
+.env
+app/.env

@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from app.models.room import RoomType, TimeSlotType
 from app.schemas import BaseSchema
+from app.schemas.feature import SFeatureOut
 from app.schemas.location import SLocationOut
 
 
@@ -20,6 +21,7 @@ class SRoomBase(BaseSchema):
 
 class SRoomOut(SRoomBase):
     id: int
+    features: list[SFeatureOut]
 
 class SRoomOutWithLocation(SRoomOut):
     location: SLocationOut

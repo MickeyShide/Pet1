@@ -6,7 +6,8 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Booking, Location, Room, TimeSlot, User
+from app.models import Booking, Location, Room, TimeSlot, User, Feature
+from app.models.feature import FeatureType
 from app.models.room import RoomType, TimeSlotType
 from app.models.booking import BookingStatus
 from app.models.timeslot import TimeSlotStatus
@@ -119,3 +120,36 @@ async def create_booking(
     session.add(booking)
     await session.flush()
     return booking
+
+
+async def create_feature(
+    session: AsyncSession,
+    faker,
+    *,
+    room: Room | None = None,
+    location: Location | None = None,
+    name: str | None = None,
+) -> Feature:
+    if room is None and location is None:
+        raise ValueError("room or location is required")
+    if room is not None and location is not None:
+        raise ValueError("feature cannot belong to both room and location")
+    if name is None:
+        name = faker.word()
+
+    if room is not None:
+        feature = Feature(
+            name=name,
+            type=FeatureType.ROOM,
+            room_id=room.id,
+        )
+    else:
+        feature = Feature(
+            name=name,
+            type=FeatureType.LOCATION,
+            location_id=location.id,  # type: ignore[union-attr]
+        )
+
+    session.add(feature)
+    await session.flush()
+    return feature

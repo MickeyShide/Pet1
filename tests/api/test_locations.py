@@ -11,6 +11,7 @@ from app.models import Location, Room
 from tests.fixtures.factories import (
     create_location,
     create_room,
+    create_feature,
 )
 
 
@@ -131,6 +132,24 @@ async def test__get_location_by_id_returns_location(async_client, db_session, fa
     data = response.json()
     assert data["id"] == loc.id
     assert data["name"] == loc.name
+
+
+@pytest.mark.asyncio
+async def test__get_location_by_id_includes_features(async_client, db_session, faker):
+    loc = await create_location(db_session, faker)
+    feature = await create_feature(db_session, faker, location=loc, name="Parking")
+    await db_session.commit()
+
+    response = await async_client.get(f"/locations/{loc.id}")
+
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["id"] == loc.id
+    assert data["features"]
+    feature_payload = data["features"][0]
+    assert feature_payload["id"] == feature.id
+    assert feature_payload["name"] == "Parking"
+    assert feature_payload["location_id"] == loc.id
 
 
 @pytest.mark.asyncio

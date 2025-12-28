@@ -39,15 +39,17 @@ class LocationBusinessService(BaseBusinessService):
     async def create_location(self, location_data: SLocationCreate) -> SLocationOut:
         location: Location = await self.location_service.create(**location_data.model_dump())
         await CacheService().delete_pattern(keys.locations_all())
+        location = await self.location_service.get_one_by_id(location.id)
         return SLocationOut.from_model(location)
 
     @new_session()
     async def update_by_id(self, location_id: int, location_data: SLocationUpdate) -> SLocationOut:
-        location: Location = await self.location_service.update_by_id(
+        await self.location_service.update_by_id(
             location_id,
             **location_data.model_dump(exclude_unset=True)
         )
         await CacheService().delete_pattern(keys.locations_all())
+        location: Location = await self.location_service.get_one_by_id(location_id)
         return SLocationOut.from_model(location)
 
     @new_session()

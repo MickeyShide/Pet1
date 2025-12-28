@@ -26,6 +26,7 @@ class RoomBusinessService(BaseBusinessService):
     @new_session()
     async def create_by_location_id(self, location_id: int, room_data: SRoomCreate) -> SRoomOut:
         room: Room = await self.room_service.create(location_id=location_id, **room_data.model_dump())
+        room = await self.room_service.get_one_by_id(room.id)
         return SRoomOut.from_model(room)
 
     @new_session(readonly=True)
@@ -35,10 +36,11 @@ class RoomBusinessService(BaseBusinessService):
 
     @new_session()
     async def update_by_id(self, room_id: int, room_data: SRoomUpdate) -> SRoomOut:
-        room: Room = await self.room_service.update_by_id(
+        await self.room_service.update_by_id(
             room_id,
             **room_data.model_dump(exclude_unset=True)
         )
+        room: Room = await self.room_service.get_one_by_id(room_id)
         return SRoomOut.from_model(room)
 
     @new_session()

@@ -15,3 +15,8 @@ class TimeSlotNotFound(NotFoundException):
 class BookingNotFound(NotFoundException):
     def __init__(self):
         super().__init__("Booking not found")
+
+
+class TimeSlotBlocked(ConflictException):
+    def __init__(self):
+        super().__init__("Timeslot is blocked")

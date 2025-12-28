@@ -1,4 +1,5 @@
 from app.schemas import BaseSchema
+from app.schemas.feature import SFeatureOut
 
 
 class SLocationBase(BaseSchema):
@@ -9,6 +10,7 @@ class SLocationBase(BaseSchema):
 
 class SLocationOut(SLocationBase):
     id: int
+    features: list[SFeatureOut]
 
 
 class SLocationCreate(SLocationBase):

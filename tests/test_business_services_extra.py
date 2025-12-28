@@ -74,7 +74,7 @@ async def test_booking_service_cancel_handles_not_canceled(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_location_business_service_returns_cached(monkeypatch):
-    cached = [SLocationOut(id=1, name="cached", address="addr", description="desc")]
+    cached = [SLocationOut(id=1, name="cached", address="addr", description="desc", features=[])]
 
     async def fake_try_get(self, key):
         return cached

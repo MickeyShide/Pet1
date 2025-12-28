@@ -18,6 +18,7 @@ class TimeSlotType(str, Enum):
 
 if TYPE_CHECKING:
     from app.models.location import Location
+    from app.models.feature import Feature
 
 class Room(BaseSQLModel, table=True):
     __tablename__ = "rooms"
@@ -40,3 +41,5 @@ class Room(BaseSQLModel, table=True):
     )
     hour_price: Decimal = Field(sa_type=DECIMAL, nullable=False)
     is_active: bool
+
+    features: list["Feature"] = Relationship(back_populates="room")

@@ -3,9 +3,10 @@ from datetime import datetime
 from sqlalchemy.exc import NoResultFound
 
 from app.models import TimeSlot
+from app.models.timeslot import TimeSlotStatus
 from app.repositories.timeslot import TimeSlotRepository
 from app.services.base import BaseService
-from app.utils.err.booking import TimeSlotNotFound, SlotAlreadyTaken
+from app.utils.err.booking import TimeSlotNotFound, SlotAlreadyTaken, TimeSlotBlocked
 
 
 class TimeSlotService(BaseService[TimeSlot]):
@@ -36,5 +37,8 @@ class TimeSlotService(BaseService[TimeSlot]):
 
         if has_active_booking:
             raise SlotAlreadyTaken()
+
+        if timeslot.status == TimeSlotStatus.BLOCKED:
+            raise TimeSlotBlocked()
 
         return timeslot

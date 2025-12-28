@@ -12,6 +12,7 @@ from tests.fixtures.factories import (
     create_room,
     create_timeslot,
     create_booking,
+    create_feature,
     create_user,
 )
 
@@ -67,6 +68,26 @@ async def test__update_room_with_admin(async_client, db_session, faker):
     assert response.status_code == 200, response.text
     await db_session.refresh(room)
     assert room.name == "Updated room"
+
+
+@pytest.mark.asyncio
+async def test__update_room_with_admin_updates_pricing(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=True)
+
+    response = await async_client.patch(
+        f"/rooms/{room.id}",
+        json={"hour_price": "250.00", "time_slot_type": "FIXED"},
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    await db_session.refresh(room)
+    assert str(room.hour_price) == "250.00"
+    assert room.time_slot_type.value == "FIXED"
 
 
 @pytest.mark.asyncio
@@ -135,6 +156,25 @@ async def test__get_room_by_id_returns_data(async_client, db_session, faker):
     data = response.json()
     assert data["id"] == room.id
     assert data["name"] == room.name
+
+
+@pytest.mark.asyncio
+async def test__get_room_by_id_includes_features(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    feature = await create_feature(db_session, faker, room=room, name="Projector")
+    await db_session.commit()
+
+    response = await async_client.get(f"/rooms/{room.id}")
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["id"] == room.id
+    assert payload["features"]
+    feature_payload = payload["features"][0]
+    assert feature_payload["id"] == feature.id
+    assert feature_payload["name"] == "Projector"
+    assert feature_payload["room_id"] == room.id
 
 
 @pytest.mark.asyncio

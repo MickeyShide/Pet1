@@ -43,9 +43,9 @@ class BaseRepository(Generic[T], ABC):
         """
         query = select(self._model_cls).filter_by(**filters)
 
-        if limit:
+        if limit is not None:
             query = query.limit(limit)
-        if offset:
+        if offset is not None:
             query = query.offset(offset)
 
         if desc:
