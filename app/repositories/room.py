@@ -1,3 +1,5 @@
+from datetime import datetime
+from decimal import Decimal
 from typing import List, Any
 
 from sqlalchemy import select
@@ -75,3 +77,12 @@ class RoomRepository(BaseRepository[Room]):
 
         res = await self.session.execute(query)
         return list(res.scalars().all())
+
+    async def get_hour_price(self, room_id: int) -> Decimal:
+        query = (
+            select(self._model_cls.hour_price)
+        ).where(
+            self._model_cls.id == room_id
+        )
+        res = await self.session.execute(query)
+        return res.scalar()

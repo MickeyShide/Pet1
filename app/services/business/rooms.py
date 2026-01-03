@@ -1,9 +1,13 @@
+from datetime import datetime
+from decimal import Decimal
 from typing import List
 
 from app.db.base import new_session
 from app.models import Room
+from app.models.room import TimeSlotType
 from app.schemas.room import SRoomOut, SRoomCreate, SRoomUpdate, SRoomOutWithLocation
-from app.schemas.timeslot import STimeSlotDateRange, STimeSlotOutWithBookingStatus, STimeSlotCreate, STimeSlotOut
+from app.schemas.timeslot import STimeSlotDateRange, STimeSlotOutWithBookingStatus, STimeSlotCreate, STimeSlotOut, \
+    SPriceQuoteOut
 from app.config import settings
 from app.services.business.base import BaseBusinessService
 from app.services.location import LocationService
@@ -11,6 +15,7 @@ from app.services.room import RoomService
 from app.services.timeslot import TimeSlotService
 from app.utils.cache import keys as cache_keys
 from app.utils.cache.cache_service import CacheService
+from app.utils.err.room import NotFlexibleTimeslotsType
 
 
 class RoomBusinessService(BaseBusinessService):
@@ -90,3 +95,16 @@ class RoomBusinessService(BaseBusinessService):
         new_slot = await self.timeslots_service.create(room_id=room_id, **timeslot_data.model_dump())
         await CacheService().delete_pattern(cache_keys.timeslots_room_prefix(room_id))
         return STimeSlotOut.from_model(new_slot)
+
+    @new_session(readonly=True)
+    async def get_price_quote(self, room_id: int, date_from: datetime, date_to: datetime) -> SPriceQuoteOut:
+
+        # проверяем что рума поддерживает кастомные таймслоты
+        room: Room = await self.room_service.get_one_by_id(room_id)
+        if room.time_slot_type != TimeSlotType.FLEXIBLE:
+            raise NotFlexibleTimeslotsType()
+
+        price = await self.room_service.get_price_quote(room_id, date_from, date_to)
+
+        return SPriceQuoteOut(price=price)
+
