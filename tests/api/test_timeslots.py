@@ -32,6 +32,113 @@ def auth_header():
 
 
 @pytest.mark.asyncio
+async def test__get_timeslots_by_range_returns_empty(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    await db_session.commit()
+
+    start = datetime.now(timezone.utc)
+    end = start + timedelta(hours=1)
+    params = {"room_id": room.id, "date_from": start.isoformat(), "date_to": end.isoformat()}
+    response = await async_client.get("/timeslots", params=params)
+
+    assert response.status_code == 200, response.text
+    assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test__get_timeslots_by_range_returns_items(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    start = datetime(2025, 1, 1, 10, 30, tzinfo=timezone.utc)
+    end = start + timedelta(hours=1, minutes=30)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start,
+        end_datetime=end,
+    )
+    await db_session.commit()
+
+    params = {
+        "room_id": room.id,
+        "date_from": (start - timedelta(minutes=5)).isoformat(),
+        "date_to": (end + timedelta(minutes=5)).isoformat(),
+    }
+    response = await async_client.get("/timeslots", params=params)
+
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert len(data) == 1
+    item = data[0]
+    assert item["id"] == str(slot.id)
+    assert item["date_from"] == start.isoformat()
+    assert item["date_to"] == end.isoformat()
+    assert item["label"] == "10:30 - 12:00"
+    assert item["hours"] == pytest.approx(1.5)
+
+
+@pytest.mark.asyncio
+async def test__get_timeslots_by_range_missing_room_id_returns_422(async_client):
+    start = datetime.now(timezone.utc)
+    end = start + timedelta(hours=1)
+    params = {"date_from": start.isoformat(), "date_to": end.isoformat()}
+    response = await async_client.get("/timeslots", params=params)
+
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_timeslots_by_range_missing_date_from_returns_422(async_client):
+    end = datetime.now(timezone.utc) + timedelta(hours=1)
+    params = {"room_id": 1, "date_to": end.isoformat()}
+    response = await async_client.get("/timeslots", params=params)
+
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_timeslots_by_range_missing_date_to_uses_full_day(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    start = datetime(2025, 1, 1, 10, 30, tzinfo=timezone.utc)
+    end = start + timedelta(hours=1)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start,
+        end_datetime=end,
+    )
+    await db_session.commit()
+
+    params = {"room_id": room.id, "date_from": start.isoformat()}
+    response = await async_client.get("/timeslots", params=params)
+
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["id"] == str(slot.id)
+
+
+@pytest.mark.asyncio
+async def test__get_timeslots_by_range_invalid_room_id_returns_422(async_client):
+    start = datetime.now(timezone.utc)
+    end = start + timedelta(hours=1)
+    params = {"room_id": "bad", "date_from": start.isoformat(), "date_to": end.isoformat()}
+    response = await async_client.get("/timeslots", params=params)
+
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_timeslots_by_range_invalid_date_from_returns_422(async_client):
+    params = {"room_id": 1, "date_from": "not-a-date", "date_to": "2025-01-01T12:00:00Z"}
+    response = await async_client.get("/timeslots", params=params)
+
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
 async def test__update_timeslot_requires_admin(async_client, db_session, faker):
     location = await create_location(db_session, faker)
     room = await create_room(db_session, faker, location=location)

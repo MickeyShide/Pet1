@@ -111,6 +111,27 @@ async def test__create_feature_with_admin(async_client, db_session, faker):
 
 
 @pytest.mark.asyncio
+async def test__create_location_feature_with_admin(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=True)
+
+    response = await async_client.post(
+        "/features",
+        json={"name": "Parking", "type": "LOCATION", "location_id": location.id},
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    created_id = response.json()["id"]
+    stored = await db_session.get(Feature, created_id)
+    assert stored is not None
+    assert stored.location_id == location.id
+    assert stored.room_id is None
+
+
+@pytest.mark.asyncio
 async def test__create_feature_invalid_payload_returns_422(async_client, db_session, faker):
     override_token(async_client.app_ref, admin=True)
 
@@ -163,6 +184,51 @@ async def test__update_feature_with_admin(async_client, db_session, faker):
 
 
 @pytest.mark.asyncio
+async def test__update_feature_switches_to_location(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    other_location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    feature = await create_feature(db_session, faker, room=room, name="Old")
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=True)
+
+    response = await async_client.patch(
+        f"/features/{feature.id}",
+        json={"type": "LOCATION", "location_id": other_location.id, "room_id": None},
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    await db_session.refresh(feature)
+    assert feature.type == FeatureType.LOCATION
+    assert feature.location_id == other_location.id
+    assert feature.room_id is None
+
+
+@pytest.mark.asyncio
+async def test__update_feature_switches_to_room(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    feature = await create_feature(db_session, faker, location=location, name="Old")
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=True)
+
+    response = await async_client.patch(
+        f"/features/{feature.id}",
+        json={"type": "ROOM", "room_id": room.id, "location_id": None},
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    await db_session.refresh(feature)
+    assert feature.type == FeatureType.ROOM
+    assert feature.room_id == room.id
+    assert feature.location_id is None
+
+
+@pytest.mark.asyncio
 async def test__update_feature_invalid_payload_returns_422(async_client, db_session, faker):
     location = await create_location(db_session, faker)
     room = await create_room(db_session, faker, location=location)
@@ -173,6 +239,60 @@ async def test__update_feature_invalid_payload_returns_422(async_client, db_sess
     response = await async_client.patch(
         f"/features/{feature.id}",
         json={"room_id": room.id, "location_id": location.id},
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__update_feature_type_without_target_returns_422(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    feature = await create_feature(db_session, faker, room=room, name="Old")
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=True)
+
+    response = await async_client.patch(
+        f"/features/{feature.id}",
+        json={"type": "LOCATION"},
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__update_feature_room_id_on_location_returns_422(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    feature = await create_feature(db_session, faker, location=location, name="Old")
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=True)
+
+    response = await async_client.patch(
+        f"/features/{feature.id}",
+        json={"room_id": room.id},
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__update_feature_empty_payload_returns_422(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    feature = await create_feature(db_session, faker, room=room, name="Old")
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=True)
+
+    response = await async_client.patch(
+        f"/features/{feature.id}",
+        json={},
         headers=auth_header(),
     )
 

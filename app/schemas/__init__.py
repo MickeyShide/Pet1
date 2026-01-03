@@ -1,8 +1,18 @@
-from pydantic import BaseModel, ConfigDict
+from datetime import datetime, timezone
+
+from pydantic import BaseModel, ConfigDict, field_serializer
 
 
 class BaseSchema(BaseModel):
     model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+    @field_serializer("*", when_used="json")
+    def _serialize_datetime(self, value):
+        if isinstance(value, datetime):
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=timezone.utc)
+            return value.isoformat()
+        return value
 
     @classmethod
     def from_model(cls, model_obj):

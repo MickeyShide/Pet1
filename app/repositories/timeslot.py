@@ -82,8 +82,8 @@ class TimeSlotRepository(BaseRepository[TimeSlot]):
                 isouter=True,  # LEFT JOIN
             )
             .where(self._model_cls.room_id == room_id)
-            .where(self._model_cls.start_datetime >= date_from)
-            .where(self._model_cls.end_datetime <= date_to)
+            .where(self._model_cls.start_datetime <= date_to)
+            .where(self._model_cls.end_datetime >= date_from)
             .order_by(self._model_cls.start_datetime)
         )
 

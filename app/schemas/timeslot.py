@@ -1,5 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
+
+from pydantic import model_validator
 
 from app.models.timeslot import TimeSlotStatus
 from app.schemas import BaseSchema
@@ -21,9 +23,33 @@ class STimeSlotOutWithBookingStatus(STimeSlotOut):
     has_active_booking: bool
 
 
-class STimeSlotDateRange(BaseSchema):
+class STimeSlotRangeOut(BaseSchema):
+    id: str
     date_from: datetime
     date_to: datetime
+    label: str
+    hours: float
+
+
+class STimeSlotDateRange(BaseSchema):
+    date_from: datetime
+    date_to: datetime | None = None
+
+    @model_validator(mode="after")
+    def _fill_date_to(self):
+        if self.date_to is None:
+            tz = self.date_from.tzinfo or timezone.utc
+            self.date_to = datetime(
+                self.date_from.year,
+                self.date_from.month,
+                self.date_from.day,
+                23,
+                59,
+                59,
+                999_999,
+                tzinfo=tz,
+            )
+        return self
 
 
 class STimeSlotCreate(STimeSlotBase):

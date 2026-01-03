@@ -56,7 +56,7 @@ async def delete_room_route(room_id: int, token_data: AdminDepends) -> None:
 async def get_room_timeslots_route(
         room_id: int,
         date_from: datetime = Query(...),
-        date_to: datetime = Query(...),
+        date_to: datetime | None = Query(None),
 ) -> List[STimeSlotOutWithBookingStatus]:
     date_range = STimeSlotDateRange(date_from=date_from, date_to=date_to)
     return await RoomBusinessService().get_timeslots_by_date_range_with_booking_flag(room_id, date_range)
