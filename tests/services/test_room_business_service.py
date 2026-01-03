@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
@@ -10,6 +11,7 @@ from app.models.room import TimeSlotType
 from app.schemas.room import SRoomCreate, SRoomUpdate
 from app.schemas.timeslot import STimeSlotCreate, STimeSlotDateRange
 from app.services.business.rooms import RoomBusinessService
+from app.utils.err.room import NotFlexibleTimeslotsType
 from tests.fixtures.factories import (
     create_booking,
     create_location,
@@ -198,3 +200,46 @@ async def test__delete_by_id__removes_room(db_session, faker):
     # Then
     result = (await db_session.execute(select(Room).where(Room.id == room.id))).scalar_one_or_none()
     assert result is None
+
+
+@pytest.mark.asyncio
+async def test__get_price_quote__flexible_returns_price(db_session, faker):
+    # Given
+    location = await create_location(db_session, faker)
+    room = await create_room(
+        db_session,
+        faker,
+        location=location,
+        hour_price=150,
+        time_slot_type=TimeSlotType.FLEXIBLE,
+    )
+    await db_session.commit()
+    service = RoomBusinessService()
+    start = datetime.now(timezone.utc)
+    end = start + timedelta(hours=2)
+
+    # When
+    result = await service.get_price_quote(room.id, start, end)
+
+    # Then
+    assert result.price == Decimal("300.00")
+
+
+@pytest.mark.asyncio
+async def test__get_price_quote__fixed_raises_conflict(db_session, faker):
+    # Given
+    location = await create_location(db_session, faker)
+    room = await create_room(
+        db_session,
+        faker,
+        location=location,
+        time_slot_type=TimeSlotType.FIXED,
+    )
+    await db_session.commit()
+    service = RoomBusinessService()
+    start = datetime.now(timezone.utc)
+    end = start + timedelta(hours=1)
+
+    # When / Then
+    with pytest.raises(NotFlexibleTimeslotsType):
+        await service.get_price_quote(room.id, start, end)
