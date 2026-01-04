@@ -52,7 +52,7 @@ class AuthBusinessService(BaseBusinessService):
             secure=settings.COOKIE_SECURE,
             samesite="lax",
             max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-            path="/auth/refresh",
+            #path="/auth/refresh",
         )
 
         return access_token, refresh_token
