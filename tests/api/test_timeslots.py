@@ -7,6 +7,7 @@ from app.api import deps
 from app.schemas.auth import SAccessToken
 from app.utils.err.base.forbidden import ForbiddenException
 from app.models import TimeSlot
+from app.models.timeslot import TimeSlotStatus
 from tests.fixtures.factories import (
     create_location,
     create_room,
@@ -76,6 +77,40 @@ async def test__get_timeslots_by_range_returns_items(async_client, db_session, f
     assert item["date_to"] == end.isoformat()
     assert item["label"] == "10:30 - 12:00"
     assert item["hours"] == pytest.approx(1.5)
+
+
+@pytest.mark.asyncio
+async def test__get_timeslots_by_range_includes_canceled(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    start = datetime(2025, 1, 1, 10, 30, tzinfo=timezone.utc)
+    end = start + timedelta(hours=1)
+    slot_active = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start,
+        end_datetime=end,
+    )
+    slot_canceled = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start + timedelta(hours=2),
+        end_datetime=start + timedelta(hours=3),
+        status=TimeSlotStatus.CANCELED,
+    )
+    await db_session.commit()
+
+    params = {
+        "room_id": room.id,
+        "date_from": (start - timedelta(minutes=5)).isoformat(),
+        "date_to": (slot_canceled.end_datetime + timedelta(minutes=5)).isoformat(),
+    }
+    response = await async_client.get("/timeslots", params=params)
+
+    assert response.status_code == 200, response.text
+    ids = {item["id"] for item in response.json()}
+    assert str(slot_active.id) in ids
+    assert str(slot_canceled.id) in ids
 
 
 @pytest.mark.asyncio

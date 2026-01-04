@@ -152,6 +152,41 @@ async def test__get_timeslots_by_date_range_with_booking_flag__marks_active_book
 
 
 @pytest.mark.asyncio
+async def test__get_timeslots_by_date_range_with_booking_flag__excludes_canceled_timeslots(db_session, faker):
+    # Given
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    start = datetime.now(timezone.utc)
+    slot_available = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start,
+        end_datetime=start + timedelta(hours=1),
+    )
+    slot_canceled = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start + timedelta(hours=2),
+        end_datetime=start + timedelta(hours=3),
+        status=TimeSlotStatus.CANCELED,
+    )
+    await db_session.commit()
+    service = RoomBusinessService()
+    date_range = STimeSlotDateRange(
+        date_from=start - timedelta(minutes=5),
+        date_to=slot_canceled.end_datetime + timedelta(minutes=5),
+    )
+
+    # When
+    result = await service.get_timeslots_by_date_range_with_booking_flag(room.id, date_range)
+
+    # Then
+    ids = {item.id for item in result}
+    assert slot_available.id in ids
+    assert slot_canceled.id not in ids
+
+
+@pytest.mark.asyncio
 async def test__update_by_id__updates_selected_fields(db_session, faker):
     # Given
     location = await create_location(db_session, faker)

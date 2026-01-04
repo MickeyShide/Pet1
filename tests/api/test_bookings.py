@@ -232,6 +232,28 @@ async def test__create_booking_route__blocked_timeslot_returns_409(async_client,
 
 
 @pytest.mark.asyncio
+async def test__create_booking_route__canceled_timeslot_returns_409(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+        status=TimeSlotStatus.CANCELED,
+    )
+    await db_session.commit()
+
+    response = await async_client.post("/bookings", json={"timeslot_id": slot.id})
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 409, response.text
+
+
+@pytest.mark.asyncio
 async def test__get_user_bookings__returns_empty_list_when_none(async_client, db_session, faker):
     user = await create_user(db_session, faker)
     await db_session.commit()

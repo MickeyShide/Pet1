@@ -4,7 +4,8 @@ import pytest
 
 from app.models.booking import BookingStatus
 from app.services.timeslot import TimeSlotService
-from app.utils.err.booking import SlotAlreadyTaken, TimeSlotNotFound
+from app.models.timeslot import TimeSlotStatus
+from app.utils.err.booking import SlotAlreadyTaken, TimeSlotNotFound, TimeSlotBlocked
 from tests.fixtures.factories import (
     create_booking,
     create_location,
@@ -104,3 +105,25 @@ async def test__lock_time_slot_for_booking__ignores_canceled_booking(db_session,
 
     # Then
     assert locked_slot.id == slot.id
+
+
+@pytest.mark.asyncio
+async def test__lock_time_slot_for_booking__rejects_canceled_timeslot(db_session, faker):
+    # Given
+    await create_user(db_session, faker)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    start = datetime.now(timezone.utc)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start,
+        end_datetime=start + timedelta(hours=1),
+        status=TimeSlotStatus.CANCELED,
+    )
+    await db_session.commit()
+    service = TimeSlotService(db_session)
+
+    # When / Then
+    with pytest.raises(TimeSlotBlocked):
+        await service.lock_time_slot_for_booking(slot.id)

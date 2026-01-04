@@ -41,9 +41,15 @@ async def test_timeslot_list_is_cached(async_client, db_session, faker, monkeypa
     call_counter = {"count": 0}
     original_get_all = TimeSlotService.get_all_by_room_id_and_date_range
 
-    async def _wrapped(self, room_id, date_from, date_to):
+    async def _wrapped(self, room_id, date_from, date_to, include_canceled=True):
         call_counter["count"] += 1
-        return await original_get_all(self, room_id=room_id, date_from=date_from, date_to=date_to)
+        return await original_get_all(
+            self,
+            room_id=room_id,
+            date_from=date_from,
+            date_to=date_to,
+            include_canceled=include_canceled,
+        )
 
     monkeypatch.setattr(TimeSlotService, "get_all_by_room_id_and_date_range", _wrapped)
 
