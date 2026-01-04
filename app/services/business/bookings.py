@@ -1,4 +1,3 @@
-import logging
 from datetime import datetime, timedelta, UTC
 from typing import List, Tuple
 
@@ -46,9 +45,9 @@ class BookingsBusinessService(BaseBusinessService):
 
     @new_session()
     async def get_my_bookings(
-        self,
-        booking_filters: SBookingFilters | None = None,
-        timeslot_filters: STimeSlotFilters | None = None,
+            self,
+            booking_filters: SBookingFilters | None = None,
+            timeslot_filters: STimeSlotFilters | None = None,
     ) -> List[SBookingOutWithTimeslots]:
         bookings_with_timeslots: List[Tuple[Booking, TimeSlot]] = (
             await self.booking_service.get_all_bookings_with_timeslots(

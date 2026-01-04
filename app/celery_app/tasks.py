@@ -9,8 +9,8 @@ from sqlalchemy import update
 from app.celery_app.app import celery_app
 from app.db import base as db_base
 from app.models.booking import Booking, BookingStatus
-from app.utils.cache.cache_service import CacheService
 from app.utils.cache import keys as cache_keys
+from app.utils.cache.cache_service import CacheService
 
 
 async def _expire_booking(booking_id: int) -> dict[str, Any]:

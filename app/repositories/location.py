@@ -11,11 +11,11 @@ class LocationRepository(BaseRepository[Location]):
     _model_cls = Location
 
     async def get_all(
-        self,
-        desc: bool = True,
-        offset: int | None = None,
-        limit: int | None = None,
-        **filters: Any,
+            self,
+            desc: bool = True,
+            offset: int | None = None,
+            limit: int | None = None,
+            **filters: Any,
     ) -> List[Location]:
         query = (
             select(self._model_cls)

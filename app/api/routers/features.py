@@ -47,9 +47,9 @@ async def create_feature_route(feature_data: SFeatureCreate, token_data: AdminDe
     description="Update existing feature",
 )
 async def update_feature_route(
-    feature_id: int,
-    feature_data: SFeatureUpdate,
-    token_data: AdminDepends,
+        feature_id: int,
+        feature_data: SFeatureUpdate,
+        token_data: AdminDepends,
 ) -> SFeatureOut:
     return await FeatureBusinessService().update_by_id(feature_id, feature_data)
 

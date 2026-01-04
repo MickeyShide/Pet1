@@ -65,7 +65,8 @@ class AuthBusinessService(BaseBusinessService):
     @new_session()
     async def login(self, request: Request, response: Response, login_data: SLogin) -> SLoginOut:
         ip_header = request.headers.get("X-Real-IP") or request.headers.get("X-Forwarded-For")
-        client_ip = (ip_header.split(",")[0].strip() if ip_header else (request.client.host if request.client else "unknown")) or "unknown"
+        client_ip = (ip_header.split(",")[0].strip() if ip_header else (
+            request.client.host if request.client else "unknown")) or "unknown"
 
         cache = CacheService()
         cache_key = cache_keys.login_ip(client_ip)

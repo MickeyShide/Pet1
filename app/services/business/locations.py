@@ -1,8 +1,8 @@
 from typing import List
 
+from app.config import settings
 from app.db.base import new_session
 from app.models import Location, Room
-from app.config import settings
 from app.schemas.location import SLocationOut, SLocationCreate, SLocationUpdate
 from app.schemas.room import SRoomOut
 from app.services.business.base import BaseBusinessService
@@ -17,7 +17,6 @@ class LocationBusinessService(BaseBusinessService):
 
     @new_session(readonly=True)
     async def get_all(self) -> list[SLocationOut]:
-
         cache = CacheService[list[SLocationOut]](model=SLocationOut, collection=True)
         cache_key = keys.locations_all()
         cached = await cache.try_get(cache_key)

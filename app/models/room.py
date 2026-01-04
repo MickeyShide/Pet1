@@ -2,9 +2,11 @@ from decimal import Decimal
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from sqlmodel import Field, Relationship
 from sqlalchemy import Enum as SAEnum, DECIMAL, CheckConstraint, text
+from sqlmodel import Field, Relationship
+
 from .base import BaseSQLModel
+
 
 class RoomType(str, Enum):
     MEETING_ROOM = "MEETING_ROOM"
@@ -12,13 +14,16 @@ class RoomType(str, Enum):
     STUDIO = "STUDIO"
     SPORT = "SPORT"
 
+
 class TimeSlotType(str, Enum):
     FLEXIBLE = "FLEXIBLE"  # Произвольное время
-    FIXED = "FIXED"        # Конкретные таймслоты
+    FIXED = "FIXED"  # Конкретные таймслоты
+
 
 if TYPE_CHECKING:
     from app.models.location import Location
     from app.models.feature import Feature
+
 
 class Room(BaseSQLModel, table=True):
     __tablename__ = "rooms"

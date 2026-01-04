@@ -31,10 +31,10 @@ class TimeSlotBusinessService(BaseBusinessService):
 
     @new_session(readonly=True)
     async def get_by_room_and_date_range(
-        self,
-        room_id: int,
-        date_from: datetime,
-        date_to: datetime,
+            self,
+            room_id: int,
+            date_from: datetime,
+            date_to: datetime,
     ) -> list[STimeSlotRangeOut]:
         timeslots_with_booking = await self.timeslots_service.get_all_by_room_id_and_date_range(
             room_id=room_id,

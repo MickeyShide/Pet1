@@ -5,6 +5,7 @@ class NotFlexibleTimeslotsType(ConflictException):
     def __init__(self):
         super().__init__("Timeslot type of this room ISNT flexible.")
 
+
 class InvalidBookingDuration(ConflictException):
     def __init__(self, min_minutes: int, step_minutes: int):
         super().__init__(

@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from fastapi import APIRouter, Query
 from starlette import status
 
@@ -17,8 +15,8 @@ router = APIRouter(prefix="/timeslots", tags=["TimeSlots"])
     description="Return timeslots by room and date range",
 )
 async def get_timeslots_route(
-    date_range: TimeSlotDateRangeDepends,
-    room_id: int = Query(...),
+        date_range: TimeSlotDateRangeDepends,
+        room_id: int = Query(...),
 ) -> list[STimeSlotRangeOut]:
     return await TimeSlotBusinessService().get_by_room_and_date_range(
         room_id=room_id,

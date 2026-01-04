@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from app.models.room import Room
     from app.models.feature import Feature
 
+
 class Location(BaseSQLModel, table=True):
     __tablename__ = "locations"
 

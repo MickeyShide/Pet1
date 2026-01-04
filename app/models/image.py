@@ -1,12 +1,15 @@
 from enum import Enum
 
-from sqlmodel import Field
 from sqlalchemy import Enum as SAEnum
+from sqlmodel import Field
+
 from .base import BaseSQLModel
+
 
 class ImageType(str, Enum):
     ROOM = "ROOM"
     LOCATION = "LOCATION"
+
 
 class Image(BaseSQLModel, table=True):
     __tablename__ = "images"

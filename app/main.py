@@ -5,8 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 
 from app.api import routers
-from app.db.base import init_engine, dispose_engine
 from app.config import settings
+from app.db.base import init_engine, dispose_engine
 from app.utils.redis import init_redis, close_redis
 
 
@@ -68,7 +68,6 @@ async def debug_ip(request: Request) -> dict[str, str | None]:
 
 
 app: FastAPI = create_app()
-
 
 if __name__ == "__main__":
     import uvicorn

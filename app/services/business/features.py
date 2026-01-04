@@ -2,8 +2,8 @@ from starlette import status
 from starlette.exceptions import HTTPException
 
 from app.db.base import new_session
-from app.models.feature import FeatureType
 from app.models import Feature
+from app.models.feature import FeatureType
 from app.schemas.feature import SFeatureCreate, SFeatureOut, SFeatureUpdate
 from app.services.business.base import BaseBusinessService
 from app.services.feature import FeatureService

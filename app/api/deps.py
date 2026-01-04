@@ -50,8 +50,8 @@ AdminDepends = Annotated[SAccessToken, Depends(get_admin_token_data)]
 
 
 def _build_timeslot_date_range(
-    date_from: datetime = Query(...),
-    date_to: datetime | None = Query(None),
+        date_from: datetime = Query(...),
+        date_to: datetime | None = Query(None),
 ) -> STimeSlotDateRange:
     try:
         return STimeSlotDateRange(date_from=date_from, date_to=date_to)

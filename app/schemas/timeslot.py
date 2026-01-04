@@ -18,6 +18,7 @@ class STimeSlotOut(STimeSlotBase):
     id: int
     room_id: int
 
+
 class SPriceQuoteIn(BaseSchema):
     date_from: datetime
     date_to: datetime
@@ -27,6 +28,7 @@ class SPriceQuoteIn(BaseSchema):
         if self.date_to <= self.date_from:
             raise ValueError("date_to must be greater than date_from")
         return self
+
 
 class SPriceQuoteOut(BaseSchema):
     price: Decimal

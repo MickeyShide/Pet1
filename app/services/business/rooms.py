@@ -1,14 +1,13 @@
 from datetime import datetime
-from decimal import Decimal
 from typing import List
 
+from app.config import settings
 from app.db.base import new_session
 from app.models import Room
 from app.models.room import TimeSlotType
 from app.schemas.room import SRoomOut, SRoomCreate, SRoomUpdate, SRoomOutWithLocation
 from app.schemas.timeslot import STimeSlotDateRange, STimeSlotOutWithBookingStatus, STimeSlotCreate, STimeSlotOut, \
     SPriceQuoteOut
-from app.config import settings
 from app.services.business.base import BaseBusinessService
 from app.services.location import LocationService
 from app.services.room import RoomService

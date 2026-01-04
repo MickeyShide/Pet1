@@ -1,9 +1,8 @@
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
 
-from sqlmodel import Field, Relationship
 from sqlalchemy import Enum as SAEnum, CheckConstraint
-
+from sqlmodel import Field, Relationship
 
 from .base import BaseSQLModel
 
@@ -12,8 +11,10 @@ class FeatureType(str, Enum):
     ROOM = "ROOM"
     LOCATION = "LOCATION"
 
+
 if TYPE_CHECKING:
     from app.models import Room, Location
+
 
 class Feature(BaseSQLModel, table=True):
     __tablename__ = "features"
