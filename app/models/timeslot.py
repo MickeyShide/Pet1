@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 
-from sqlalchemy import Enum as SAEnum, CheckConstraint, UniqueConstraint, text
+from sqlalchemy import Enum as SAEnum, CheckConstraint, Index, text
 from sqlalchemy import TIMESTAMP, DECIMAL
 from sqlalchemy.dialects.postgresql import ExcludeConstraint
 from sqlmodel import Field
@@ -13,6 +13,7 @@ from .base import BaseSQLModel
 class TimeSlotStatus(str, Enum):
     AVAILABLE = "AVAILABLE"
     BLOCKED = "BLOCKED"
+    CANCELED = "CANCELED"
 
 
 class TimeSlot(BaseSQLModel, table=True):
@@ -32,29 +33,23 @@ class TimeSlot(BaseSQLModel, table=True):
     )
 
     __table_args__ = (
+        CheckConstraint("start_datetime < end_datetime", name="ck_timeslot_start_before_end"),
 
-        # start < end
-        CheckConstraint(
-            "start_datetime < end_datetime",
-            name="ck_timeslot_start_before_end",
-        ),
-
-        # unique start-end pair
-        UniqueConstraint(
+        Index(
+            "uq_timeslot_unique_range_active",
             "room_id",
             "start_datetime",
             "end_datetime",
-            name="uq_timeslot_unique_range",
+            unique=True,
+            postgresql_where=text("status != 'CANCELED'"),
+            sqlite_where=text("status != 'CANCELED'"),
         ),
 
-        # overlapping time intervals
         ExcludeConstraint(
             ("room_id", "="),
-            (
-                text("tstzrange(start_datetime, end_datetime, '[]')"),
-                "&&",
-            ),
-            name="timeslot_no_overlap_per_room",
+            (text("tstzrange(start_datetime, end_datetime, '[)')"), "&&"),
+            name="timeslot_no_overlap_available_per_room",
             using="gist",
+            where=text("status != 'CANCELED'"),
         ),
     )

@@ -74,6 +74,7 @@ class RoomBusinessService(BaseBusinessService):
                 room_id=room_id,
                 date_from=date_range.date_from,
                 date_to=date_range.date_to,
+                include_canceled=False,
             )
             timeslot_dicts: List[STimeSlotOutWithBookingStatus] = [
                 STimeSlotOutWithBookingStatus(

@@ -16,12 +16,14 @@ class TimeSlotService(BaseService[TimeSlot]):
             self,
             room_id: int,
             date_from: datetime,
-            date_to: datetime
+            date_to: datetime,
+            include_canceled: bool = True,
     ) -> list[tuple[TimeSlot, bool]]:
         return await self._repository.get_all_by_room_id_and_date_range(
             room_id=room_id,
             date_from=date_from,
-            date_to=date_to
+            date_to=date_to,
+            include_canceled=include_canceled,
         )
 
     async def lock_time_slot_for_booking(self, timeslot_id: int) -> TimeSlot:
@@ -38,7 +40,7 @@ class TimeSlotService(BaseService[TimeSlot]):
         if has_active_booking:
             raise SlotAlreadyTaken()
 
-        if timeslot.status == TimeSlotStatus.BLOCKED:
+        if timeslot.status != TimeSlotStatus.AVAILABLE:
             raise TimeSlotBlocked()
 
         return timeslot

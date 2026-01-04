@@ -6,7 +6,7 @@ from sqlalchemy.orm import aliased
 
 from app.models import Booking
 from app.models.booking import BookingStatus
-from app.models.timeslot import TimeSlot
+from app.models.timeslot import TimeSlot, TimeSlotStatus
 from app.repositories.base import BaseRepository
 
 
@@ -55,6 +55,7 @@ class TimeSlotRepository(BaseRepository[TimeSlot]):
             room_id: int,
             date_from: datetime,
             date_to: datetime,
+            include_canceled: bool = True,
     ) -> list[tuple[TimeSlot, bool]]:
         """
         Retrieve all timeslots for a room and a date range, with has_active_booking flag
@@ -86,6 +87,8 @@ class TimeSlotRepository(BaseRepository[TimeSlot]):
             .where(self._model_cls.end_datetime >= date_from)
             .order_by(self._model_cls.start_datetime)
         )
+        if not include_canceled:
+            stmt = stmt.where(self._model_cls.status != TimeSlotStatus.CANCELED)
 
         result = await self.session.execute(stmt)
         rows = result.all()  # list[Row[TimeSlot, bool]]
