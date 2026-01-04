@@ -80,7 +80,7 @@ async def async_engine():
             await conn.run_sync(SQLModel.metadata.create_all)
     else:
         # Apply migrations for Postgres
-        config_path = os.path.join(os.path.dirname(__file__), "..", "alembic.ini")
+        config_path = os.path.join(os.path.dirname(__file__), "..", "alembic.autotests.ini")
         alembic_cfg = AlembicConfig(file_=config_path)
         alembic_command.upgrade(alembic_cfg, "head")
 

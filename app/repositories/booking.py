@@ -25,7 +25,7 @@ class BookingRepository(BaseRepository[Booking]):
         )
 
         if booking_filters is not None:
-            for column, value in booking_filters.model_dump(exclude_unset=True).items():
+            for column, value in booking_filters.to_dict().items():
                 if value is not None:
                     stmt = stmt.where(getattr(self._model_cls, column) == value)
 

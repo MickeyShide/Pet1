@@ -28,7 +28,7 @@ class PaymentBusinessService(BaseBusinessService):
             **SPaymentCreate(
                 booking_id=booking_id,
                 external_id=Faker().uuid4(),
-            ).model_dump()
+            ).to_dict()
         )
 
         return SPaymentOut.from_model(payment)

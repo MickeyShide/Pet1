@@ -3,7 +3,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from sqlmodel import Field, Relationship
-from sqlalchemy import Enum as SAEnum, DECIMAL
+from sqlalchemy import Enum as SAEnum, DECIMAL, CheckConstraint, text
 from .base import BaseSQLModel
 
 class RoomType(str, Enum):
@@ -22,6 +22,20 @@ if TYPE_CHECKING:
 
 class Room(BaseSQLModel, table=True):
     __tablename__ = "rooms"
+    __table_args__ = (
+        CheckConstraint(
+            "min_booking_duration_minutes > 0",
+            name="ck_rooms_min_booking_duration_minutes_positive",
+        ),
+        CheckConstraint(
+            "booking_step_minutes > 0",
+            name="ck_rooms_booking_step_minutes_positive",
+        ),
+        CheckConstraint(
+            "booking_step_minutes <= min_booking_duration_minutes",
+            name="ck_rooms_booking_step_lte_min_duration",
+        ),
+    )
 
     location_id: int = Field(foreign_key="locations.id", nullable=False)
     location: "Location" = Relationship(back_populates="rooms")
@@ -39,6 +53,14 @@ class Room(BaseSQLModel, table=True):
     time_slot_type: TimeSlotType = Field(
         sa_type=SAEnum(TimeSlotType, name="pet1_timeslottype"), default=TimeSlotType.FLEXIBLE
     )
+
+    min_booking_duration_minutes: int = Field(
+        default=60, nullable=False, sa_column_kwargs={"server_default": text("60")}
+    )
+    booking_step_minutes: int = Field(
+        default=60, nullable=False, sa_column_kwargs={"server_default": text("60")}
+    )
+
     hour_price: Decimal = Field(sa_type=DECIMAL, nullable=False)
     is_active: bool
 

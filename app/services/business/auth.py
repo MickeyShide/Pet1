@@ -36,13 +36,13 @@ class AuthBusinessService(BaseBusinessService):
             SAccessToken(
                 sub=str(user.id),
                 admin=(user.role == UserRole.ADMIN),
-            ).model_dump()
+            ).to_dict()
         )
 
         refresh_token = create_refresh_token(
             SRefreshToken(
                 sub=str(user.id)
-            ).model_dump()
+            ).to_dict()
         )
 
         response.set_cookie(

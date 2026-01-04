@@ -23,3 +23,9 @@ class BaseSchema(BaseModel):
         - использует pydantic v2 model_validate
         """
         return cls.model_validate(model_obj)
+
+    def to_dict(self) -> dict:
+        """
+        without unset!
+        """
+        return self.model_dump(exclude_unset=True)

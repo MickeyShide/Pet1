@@ -1,5 +1,7 @@
 from decimal import Decimal
 
+from pydantic import model_validator
+
 from app.models.room import RoomType, TimeSlotType
 from app.schemas import BaseSchema
 from app.schemas.feature import SFeatureOut
@@ -14,14 +16,16 @@ class SRoomBase(BaseSchema):
     type: RoomType | None
     image_id: int | None
     time_slot_type: TimeSlotType
+    min_booking_duration_minutes: int
+    booking_step_minutes: int
     hour_price: Decimal
     is_active: bool
-
 
 
 class SRoomOut(SRoomBase):
     id: int
     features: list[SFeatureOut]
+
 
 class SRoomOutWithLocation(SRoomOut):
     location: SLocationOut
@@ -33,6 +37,8 @@ class SRoomCreate(BaseSchema):
     description: str
     is_active: bool
     time_slot_type: TimeSlotType
+    min_booking_duration_minutes: int | None = None
+    booking_step_minutes: int | None = None
     hour_price: Decimal
 
 
@@ -43,4 +49,6 @@ class SRoomUpdate(BaseSchema):
     is_active: bool | None = None
     location_id: int | None = None
     time_slot_type: TimeSlotType | None = None
+    min_booking_duration_minutes: int | None = None
+    booking_step_minutes: int | None = None
     hour_price: Decimal | None = None

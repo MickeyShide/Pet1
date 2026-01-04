@@ -33,7 +33,7 @@ async def test__create_by_location_id__persists_room(db_session, faker):
         description="Board room",
         is_active=True,
         time_slot_type=TimeSlotType.FLEXIBLE,
-        hour_price=150.0,
+        hour_price=Decimal(150.0),
     )
 
     # When
@@ -46,6 +46,10 @@ async def test__create_by_location_id__persists_room(db_session, faker):
     assert stored.location_id == location.id
     assert stored.hour_price == payload.hour_price
     assert stored.time_slot_type == payload.time_slot_type
+    assert result.min_booking_duration_minutes == 60
+    assert result.booking_step_minutes == 60
+    assert stored.min_booking_duration_minutes == 60
+    assert stored.booking_step_minutes == 60
 
 
 @pytest.mark.asyncio
@@ -187,6 +191,26 @@ async def test__update_by_id__updates_new_fields(db_session, faker):
 
 
 @pytest.mark.asyncio
+async def test__update_by_id__updates_booking_duration_fields(db_session, faker):
+    # Given
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    await db_session.commit()
+    service = RoomBusinessService()
+    payload = SRoomUpdate(min_booking_duration_minutes=90, booking_step_minutes=30)
+
+    # When
+    result = await service.update_by_id(room.id, payload)
+
+    # Then
+    assert result.min_booking_duration_minutes == payload.min_booking_duration_minutes
+    assert result.booking_step_minutes == payload.booking_step_minutes
+    await db_session.refresh(room)
+    assert room.min_booking_duration_minutes == payload.min_booking_duration_minutes
+    assert room.booking_step_minutes == payload.booking_step_minutes
+
+
+@pytest.mark.asyncio
 async def test__delete_by_id__removes_room(db_session, faker):
     # Given
     location = await create_location(db_session, faker)
@@ -215,7 +239,7 @@ async def test__get_price_quote__flexible_returns_price(db_session, faker):
     )
     await db_session.commit()
     service = RoomBusinessService()
-    start = datetime.now(timezone.utc)
+    start = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
     end = start + timedelta(hours=2)
 
     # When
@@ -237,7 +261,7 @@ async def test__get_price_quote__fixed_raises_conflict(db_session, faker):
     )
     await db_session.commit()
     service = RoomBusinessService()
-    start = datetime.now(timezone.utc)
+    start = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
     end = start + timedelta(hours=1)
 
     # When / Then

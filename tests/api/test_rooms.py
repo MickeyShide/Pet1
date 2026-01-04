@@ -99,7 +99,7 @@ async def test__create_room_timeslot_requires_admin(async_client, db_session, fa
     await db_session.commit()
     override_token(async_client.app_ref, admin=False)
 
-    start = datetime.now(timezone.utc)
+    start = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
     payload = {
         "start_datetime": start.isoformat(),
         "end_datetime": (start + timedelta(hours=1)).isoformat(),
@@ -124,7 +124,7 @@ async def test__create_room_timeslot_with_admin(async_client, db_session, faker)
     await db_session.commit()
     override_token(async_client.app_ref, admin=True)
 
-    start = datetime.now(timezone.utc)
+    start = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
     payload = {
         "start_datetime": start.isoformat(),
         "end_datetime": (start + timedelta(hours=2)).isoformat(),
@@ -209,7 +209,7 @@ async def test__get_room_timeslots_returns_booking_flags(async_client, db_sessio
     user = await create_user(db_session, faker)
     location = await create_location(db_session, faker)
     room = await create_room(db_session, faker, location=location)
-    start = datetime.now(timezone.utc)
+    start = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
     slot_with_booking = await create_timeslot(
         db_session,
         room=room,
@@ -246,7 +246,7 @@ async def test__get_room_timeslots_returns_booking_flags(async_client, db_sessio
 async def test__get_room_timeslots_accepts_query_params(async_client, db_session, faker):
     location = await create_location(db_session, faker)
     room = await create_room(db_session, faker, location=location)
-    start = datetime.now(timezone.utc)
+    start = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
     slot = await create_timeslot(
         db_session,
         room=room,
@@ -337,7 +337,7 @@ async def test__get_price_quote_requires_auth(async_client, db_session, faker):
     location = await create_location(db_session, faker)
     room = await create_room(db_session, faker, location=location)
     await db_session.commit()
-    start = datetime.now(timezone.utc)
+    start = datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)
     payload = {
         "date_from": start.isoformat(),
         "date_to": (start + timedelta(hours=1)).isoformat(),
@@ -358,12 +358,12 @@ async def test__get_price_quote_returns_price(async_client, db_session, faker):
         db_session,
         faker,
         location=location,
-        hour_price=150,
+        hour_price=Decimal(150),
         time_slot_type=TimeSlotType.FLEXIBLE,
     )
     await db_session.commit()
     override_token(async_client.app_ref, admin=False)
-    start = datetime.now(timezone.utc)
+    start = datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)
     payload = {
         "date_from": start.isoformat(),
         "date_to": (start + timedelta(hours=2)).isoformat(),
@@ -387,7 +387,7 @@ async def test__get_price_quote_invalid_dates_returns_422(async_client, db_sessi
     room = await create_room(db_session, faker, location=location)
     await db_session.commit()
     override_token(async_client.app_ref, admin=False)
-    start = datetime.now(timezone.utc)
+    start = datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)
     payload = {
         "date_from": start.isoformat(),
         "date_to": start.isoformat(),
@@ -414,7 +414,7 @@ async def test__get_price_quote_fixed_room_returns_409(async_client, db_session,
     )
     await db_session.commit()
     override_token(async_client.app_ref, admin=False)
-    start = datetime.now(timezone.utc)
+    start = datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)
     payload = {
         "date_from": start.isoformat(),
         "date_to": (start + timedelta(hours=1)).isoformat(),
@@ -428,3 +428,167 @@ async def test__get_price_quote_fixed_room_returns_409(async_client, db_session,
 
     async_client.app_ref.dependency_overrides.clear()
     assert response.status_code == 409, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_price_quote_room_not_found_returns_404(async_client, db_session):
+    override_token(async_client.app_ref, admin=False)
+    start = datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)
+    payload = {
+        "date_from": start.isoformat(),
+        "date_to": (start + timedelta(hours=1)).isoformat(),
+    }
+
+    response = await async_client.post(
+        "/rooms/9999/price-quote",
+        json=payload,
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 404, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_price_quote_rejects_too_short_duration(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(
+        db_session,
+        faker,
+        location=location,
+        hour_price=Decimal("100.00"),
+        min_booking_duration_minutes=120,
+        booking_step_minutes=30,
+    )
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=False)
+    start = datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)
+    payload = {
+        "date_from": start.isoformat(),
+        "date_to": (start + timedelta(minutes=60)).isoformat(),
+    }
+
+    response = await async_client.post(
+        f"/rooms/{room.id}/price-quote",
+        json=payload,
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 409, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_price_quote_rejects_unaligned_start(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(
+        db_session,
+        faker,
+        location=location,
+        hour_price=Decimal("100.00"),
+        min_booking_duration_minutes=60,
+        booking_step_minutes=30,
+    )
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=False)
+    start = datetime(2024, 1, 1, 10, 10, tzinfo=timezone.utc)
+    payload = {
+        "date_from": start.isoformat(),
+        "date_to": (start + timedelta(hours=1)).isoformat(),
+    }
+
+    response = await async_client.post(
+        f"/rooms/{room.id}/price-quote",
+        json=payload,
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 409, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_price_quote_rejects_unaligned_duration(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(
+        db_session,
+        faker,
+        location=location,
+        hour_price=Decimal("100.00"),
+        min_booking_duration_minutes=60,
+        booking_step_minutes=30,
+    )
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=False)
+    start = datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)
+    payload = {
+        "date_from": start.isoformat(),
+        "date_to": (start + timedelta(minutes=45)).isoformat(),
+    }
+
+    response = await async_client.post(
+        f"/rooms/{room.id}/price-quote",
+        json=payload,
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 409, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_price_quote_rejects_seconds(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(
+        db_session,
+        faker,
+        location=location,
+        hour_price=Decimal("100.00"),
+    )
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=False)
+    start = datetime(2024, 1, 1, 10, 0, 30, tzinfo=timezone.utc)
+    payload = {
+        "date_from": start.isoformat(),
+        "date_to": (start + timedelta(hours=1)).isoformat(),
+    }
+
+    response = await async_client.post(
+        f"/rooms/{room.id}/price-quote",
+        json=payload,
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 409, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_price_quote_allows_step_over_hour(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(
+        db_session,
+        faker,
+        location=location,
+        hour_price=Decimal("100.00"),
+        min_booking_duration_minutes=90,
+        booking_step_minutes=90,
+    )
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=False)
+    start = datetime(2024, 1, 1, 1, 30, tzinfo=timezone.utc)
+    payload = {
+        "date_from": start.isoformat(),
+        "date_to": (start + timedelta(minutes=90)).isoformat(),
+    }
+
+    response = await async_client.post(
+        f"/rooms/{room.id}/price-quote",
+        json=payload,
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    price_value = response.json()["price"]
+    assert Decimal(str(price_value)) == Decimal("150.00")

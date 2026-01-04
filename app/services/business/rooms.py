@@ -15,7 +15,7 @@ from app.services.room import RoomService
 from app.services.timeslot import TimeSlotService
 from app.utils.cache import keys as cache_keys
 from app.utils.cache.cache_service import CacheService
-from app.utils.err.room import NotFlexibleTimeslotsType
+from app.utils.err.room import NotFlexibleTimeslotsType, InvalidBookingDuration
 
 
 class RoomBusinessService(BaseBusinessService):
@@ -30,7 +30,7 @@ class RoomBusinessService(BaseBusinessService):
 
     @new_session()
     async def create_by_location_id(self, location_id: int, room_data: SRoomCreate) -> SRoomOut:
-        room: Room = await self.room_service.create(location_id=location_id, **room_data.model_dump())
+        room: Room = await self.room_service.create(location_id=location_id, **room_data.to_dict())
         room = await self.room_service.get_one_by_id(room.id)
         return SRoomOut.from_model(room)
 
@@ -43,7 +43,7 @@ class RoomBusinessService(BaseBusinessService):
     async def update_by_id(self, room_id: int, room_data: SRoomUpdate) -> SRoomOut:
         await self.room_service.update_by_id(
             room_id,
-            **room_data.model_dump(exclude_unset=True)
+            **room_data.to_dict()
         )
         room: Room = await self.room_service.get_one_by_id(room_id)
         return SRoomOut.from_model(room)
@@ -76,7 +76,7 @@ class RoomBusinessService(BaseBusinessService):
             )
             timeslot_dicts: List[STimeSlotOutWithBookingStatus] = [
                 STimeSlotOutWithBookingStatus(
-                    **STimeSlotOut.from_model(slot).model_dump(),
+                    **STimeSlotOut.from_model(slot).to_dict(),
                     has_active_booking=has_active_booking,
                 )
                 for slot, has_active_booking in timeslots_with_booking
@@ -92,7 +92,7 @@ class RoomBusinessService(BaseBusinessService):
 
     @new_session()
     async def create_timeslot(self, room_id: int, timeslot_data: STimeSlotCreate) -> STimeSlotOut:
-        new_slot = await self.timeslots_service.create(room_id=room_id, **timeslot_data.model_dump())
+        new_slot = await self.timeslots_service.create(room_id=room_id, **timeslot_data.to_dict())
         await CacheService().delete_pattern(cache_keys.timeslots_room_prefix(room_id))
         return STimeSlotOut.from_model(new_slot)
 
@@ -104,7 +104,33 @@ class RoomBusinessService(BaseBusinessService):
         if room.time_slot_type != TimeSlotType.FLEXIBLE:
             raise NotFlexibleTimeslotsType()
 
+        # проверяем что длительность стакается с min_booking_duration_minutes и booking_step_minutes
+        min_minutes = room.min_booking_duration_minutes
+        step_minutes = room.booking_step_minutes
+        start_minute_of_day = date_from.hour * 60 + date_from.minute
+        delta = date_to - date_from
+        duration_minutes = delta.days * 24 * 60 + delta.seconds // 60
+
+        if (
+                # 1. тайм не выровнен по минутам
+                date_from.second != 0
+                or date_from.microsecond != 0
+                or date_to.second != 0
+                or date_to.microsecond != 0
+                or delta.microseconds != 0
+                or delta.seconds % 60 != 0
+                or
+                # 2. длительность меньше минимальной
+                duration_minutes < min_minutes
+                or
+                # 3. старт не по сетке шага (запрет 00:13 при шаге 15)
+                start_minute_of_day % step_minutes != 0
+                or
+                # 4. длительность не кратна шагу
+                duration_minutes % step_minutes != 0
+        ):
+            raise InvalidBookingDuration(min_minutes=min_minutes, step_minutes=step_minutes)
+
         price = await self.room_service.get_price_quote(room_id, date_from, date_to)
 
         return SPriceQuoteOut(price=price)
-

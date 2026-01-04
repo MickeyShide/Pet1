@@ -25,7 +25,7 @@ class FeatureBusinessService(BaseBusinessService):
 
     @new_session()
     async def create(self, feature_data: SFeatureCreate) -> SFeatureOut:
-        feature: Feature = await self.feature_service.create(**feature_data.model_dump())
+        feature: Feature = await self.feature_service.create(**feature_data.to_dict())
         await CacheService().delete_pattern(keys.locations_all())
         return SFeatureOut.from_model(feature)
 
@@ -58,7 +58,7 @@ class FeatureBusinessService(BaseBusinessService):
 
         feature: Feature = await self.feature_service.update_by_id(
             feature_id,
-            **feature_data.model_dump(exclude_unset=True),
+            **feature_data.to_dict(),
         )
         await CacheService().delete_pattern(keys.locations_all())
         return SFeatureOut.from_model(feature)

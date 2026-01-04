@@ -90,10 +90,10 @@ class CacheService(Generic[T]):
             # ожидаем list[BaseSchema]
             if not isinstance(value, list):
                 raise TypeError("Expected list[...] for collection cache.")
-            payload = [item.model_dump() for item in value]  # type: ignore[attr-defined]
+            payload = [item.to_dict() for item in value]  # type: ignore[attr-defined]
         else:
             # одиночная модель
-            payload = value.model_dump()  # type: ignore[attr-defined]
+            payload = value.to_dict()  # type: ignore[attr-defined]
 
         return json.dumps(payload, default=str)
 

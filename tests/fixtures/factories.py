@@ -54,10 +54,12 @@ async def create_room(
     time_slot_type: TimeSlotType = TimeSlotType.FLEXIBLE,
     room_type: RoomType | None = None,
     image_id: int | None = None,
+    min_booking_duration_minutes: int | None = None,
+    booking_step_minutes: int | None = None,
 ) -> Room:
     if hour_price is None:
         hour_price = Decimal(faker.random_int(min=0, max=12312))
-    room = Room(
+    room_kwargs = dict(
         location_id=location.id,
         name=faker.color_name(),
         capacity=faker.random_int(min=1, max=20),
@@ -68,6 +70,11 @@ async def create_room(
         type=room_type,
         image_id=image_id,
     )
+    if min_booking_duration_minutes is not None:
+        room_kwargs["min_booking_duration_minutes"] = min_booking_duration_minutes
+    if booking_step_minutes is not None:
+        room_kwargs["booking_step_minutes"] = booking_step_minutes
+    room = Room(**room_kwargs)
     session.add(room)
     await session.flush()
     return room

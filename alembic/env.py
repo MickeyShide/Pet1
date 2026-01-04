@@ -13,20 +13,10 @@ import sqlmodel
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app.models import BaseSQLModel  # Важно!
-from app.config import settings
 
 
 config = context.config
 
-# Берём URL из настроек
-db_url = make_url(settings.DATABASE_URL)
-
-# Если URL asyncpg — делаем из него sync-версию
-if db_url.drivername.endswith("+asyncpg"):
-    db_url = db_url.set(
-        drivername=db_url.drivername.replace("+asyncpg", "+psycopg2")
-    )
-config.set_main_option("sqlalchemy.url", db_url.render_as_string(False))
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:

@@ -18,7 +18,7 @@ class TimeSlotBusinessService(BaseBusinessService):
     @new_session()
     async def update_timeslot_by_id(self, timeslot_id: int, timeslot_data: STimeSlotUpdate):
         updated = await self.timeslots_service.update_by_id(
-            timeslot_id, **timeslot_data.model_dump(exclude_unset=True)
+            timeslot_id, **timeslot_data.to_dict()
         )
         await CacheService().delete_pattern(cache_keys.timeslots_room_prefix(updated.room_id))
         return updated
