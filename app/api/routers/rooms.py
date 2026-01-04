@@ -74,5 +74,5 @@ async def create_room_timeslot(room_id: int, timeslot_data: STimeSlotCreate, adm
     response_model=SPriceQuoteOut,
     status_code=status.HTTP_200_OK,
     description="Return room price quote for a date range", )
-async def get_price_quote_route(room_id: int, data: SPriceQuoteIn, user_data: UserDepends) -> SPriceQuoteOut:
+async def get_price_quote_route(room_id: int, data: SPriceQuoteIn) -> SPriceQuoteOut:
     return await RoomBusinessService().get_price_quote(room_id=room_id, date_from=data.date_from, date_to=data.date_to)
