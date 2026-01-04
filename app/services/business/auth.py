@@ -50,7 +50,7 @@ class AuthBusinessService(BaseBusinessService):
             value=refresh_token,
             httponly=True,
             secure=settings.COOKIE_SECURE,
-            samesite="lax",
+            samesite="none",
             max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
             #path="/auth/refresh",
         )
