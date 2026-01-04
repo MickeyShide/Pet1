@@ -78,6 +78,12 @@ class STimeSlotUpdate(BaseSchema):
     status: TimeSlotStatus | None = None
     room_id: int | None = None
 
+    @model_validator(mode="after")
+    def _validate_payload(self):
+        payload = self.model_dump(exclude_unset=True)
+        if not payload:
+            raise ValueError("At least one field must be provided")
+
 
 class STimeSlotFilters(BaseSchema):
     start_datetime: datetime | None = None

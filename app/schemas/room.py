@@ -52,3 +52,9 @@ class SRoomUpdate(BaseSchema):
     min_booking_duration_minutes: int | None = None
     booking_step_minutes: int | None = None
     hour_price: Decimal | None = None
+
+    @model_validator(mode="after")
+    def _validate_payload(self):
+        payload = self.model_dump(exclude_unset=True)
+        if not payload:
+            raise ValueError("At least one field must be provided")
