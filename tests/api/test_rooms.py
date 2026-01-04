@@ -54,6 +54,20 @@ async def test__update_room_requires_admin(async_client, db_session, faker):
 
 
 @pytest.mark.asyncio
+async def test__update_room_requires_auth(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    await db_session.commit()
+
+    response = await async_client.patch(
+        f"/rooms/{room.id}",
+        json={"name": "New name"},
+    )
+
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test__update_room_with_admin(async_client, db_session, faker):
     location = await create_location(db_session, faker)
     room = await create_room(db_session, faker, location=location)
@@ -70,6 +84,60 @@ async def test__update_room_with_admin(async_client, db_session, faker):
     assert response.status_code == 200, response.text
     await db_session.refresh(room)
     assert room.name == "Updated room"
+
+
+@pytest.mark.asyncio
+async def test__update_room_with_admin_updates_booking_duration_fields(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=True)
+
+    response = await async_client.patch(
+        f"/rooms/{room.id}",
+        json={"min_booking_duration_minutes": 90, "booking_step_minutes": 30},
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 200, response.text
+    await db_session.refresh(room)
+    assert room.min_booking_duration_minutes == 90
+    assert room.booking_step_minutes == 30
+
+
+@pytest.mark.asyncio
+async def test__update_room_empty_payload_returns_422(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=True)
+
+    response = await async_client.patch(
+        f"/rooms/{room.id}",
+        json={},
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__update_room_invalid_time_slot_type_returns_422(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=True)
+
+    response = await async_client.patch(
+        f"/rooms/{room.id}",
+        json={"time_slot_type": "WRONG"},
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422, response.text
 
 
 @pytest.mark.asyncio
@@ -147,6 +215,75 @@ async def test__create_room_timeslot_with_admin(async_client, db_session, faker)
 
 
 @pytest.mark.asyncio
+async def test__create_room_timeslot_invalid_payload_returns_422(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=True)
+
+    payload = {
+        "start_datetime": datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc).isoformat(),
+        "base_price": 150,
+        "status": "AVAILABLE",
+    }
+
+    response = await async_client.post(
+        f"/rooms/{room.id}/timeslots",
+        json=payload,
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__create_room_timeslot_invalid_status_returns_422(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=True)
+
+    start = datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)
+    payload = {
+        "start_datetime": start.isoformat(),
+        "end_datetime": (start + timedelta(hours=1)).isoformat(),
+        "base_price": 150,
+        "status": "BROKEN",
+    }
+
+    response = await async_client.post(
+        f"/rooms/{room.id}/timeslots",
+        json=payload,
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__create_room_timeslot_missing_room_returns_404(async_client):
+    override_token(async_client.app_ref, admin=True)
+    start = datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)
+    payload = {
+        "start_datetime": start.isoformat(),
+        "end_datetime": (start + timedelta(hours=1)).isoformat(),
+        "base_price": 150,
+        "status": "AVAILABLE",
+    }
+
+    response = await async_client.post(
+        "/rooms/9999/timeslots",
+        json=payload,
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test__get_room_by_id_returns_data(async_client, db_session, faker):
     location = await create_location(db_session, faker)
     room = await create_room(db_session, faker, location=location)
@@ -158,6 +295,8 @@ async def test__get_room_by_id_returns_data(async_client, db_session, faker):
     data = response.json()
     assert data["id"] == room.id
     assert data["name"] == room.name
+    assert data["min_booking_duration_minutes"] == room.min_booking_duration_minutes
+    assert data["booking_step_minutes"] == room.booking_step_minutes
 
 
 @pytest.mark.asyncio
@@ -202,6 +341,8 @@ async def test__get_all_rooms_returns_locations(async_client, db_session, faker)
     assert {room_a.id, room_b.id}.issubset(ids)
     for item in payload:
         assert item["location"]["id"] == location.id
+        assert item["min_booking_duration_minutes"] is not None
+        assert item["booking_step_minutes"] is not None
 
 
 @pytest.mark.asyncio
@@ -243,6 +384,53 @@ async def test__get_room_timeslots_returns_booking_flags(async_client, db_sessio
 
 
 @pytest.mark.asyncio
+async def test__get_room_timeslots_missing_date_from_returns_422(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    await db_session.commit()
+
+    response = await async_client.get(f"/rooms/{room.id}/timeslots")
+
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_room_timeslots_invalid_date_from_returns_422(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    await db_session.commit()
+
+    response = await async_client.get(
+        f"/rooms/{room.id}/timeslots", params={"date_from": "not-a-date"}
+    )
+
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_room_timeslots_missing_date_to_uses_full_day(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    start = datetime(2025, 1, 1, 10, 30, tzinfo=timezone.utc)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start,
+        end_datetime=start + timedelta(hours=1),
+    )
+    await db_session.commit()
+
+    response = await async_client.get(
+        f"/rooms/{room.id}/timeslots",
+        params={"date_from": start.isoformat()},
+    )
+
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["id"] == slot.id
+
+@pytest.mark.asyncio
 async def test__get_room_timeslots_accepts_query_params(async_client, db_session, faker):
     location = await create_location(db_session, faker)
     room = await create_room(db_session, faker, location=location)
@@ -263,6 +451,16 @@ async def test__get_room_timeslots_accepts_query_params(async_client, db_session
 
     assert response.status_code == 200, response.text
     assert len(response.json()) == 1
+
+
+@pytest.mark.asyncio
+async def test__get_room_timeslots_missing_room_returns_404(async_client):
+    response = await async_client.get(
+        "/rooms/9999/timeslots",
+        params={"date_from": datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc).isoformat()},
+    )
+
+    assert response.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -391,6 +589,48 @@ async def test__get_price_quote_invalid_dates_returns_422(async_client, db_sessi
     payload = {
         "date_from": start.isoformat(),
         "date_to": start.isoformat(),
+    }
+
+    response = await async_client.post(
+        f"/rooms/{room.id}/price-quote",
+        json=payload,
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_price_quote_missing_date_from_returns_422(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=False)
+    end = datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
+    payload = {
+        "date_to": end.isoformat(),
+    }
+
+    response = await async_client.post(
+        f"/rooms/{room.id}/price-quote",
+        json=payload,
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_price_quote_missing_date_to_returns_422(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=False)
+    start = datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)
+    payload = {
+        "date_from": start.isoformat(),
     }
 
     response = await async_client.post(
@@ -551,6 +791,34 @@ async def test__get_price_quote_rejects_seconds(async_client, db_session, faker)
     payload = {
         "date_from": start.isoformat(),
         "date_to": (start + timedelta(hours=1)).isoformat(),
+    }
+
+    response = await async_client.post(
+        f"/rooms/{room.id}/price-quote",
+        json=payload,
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 409, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_price_quote_rejects_end_seconds(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(
+        db_session,
+        faker,
+        location=location,
+        hour_price=Decimal("100.00"),
+    )
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=False)
+    start = datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)
+    end = datetime(2024, 1, 1, 11, 0, 15, tzinfo=timezone.utc)
+    payload = {
+        "date_from": start.isoformat(),
+        "date_to": end.isoformat(),
     }
 
     response = await async_client.post(

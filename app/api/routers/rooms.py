@@ -1,12 +1,11 @@
-from datetime import datetime
 from typing import List
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
 from starlette import status
 
-from app.api.deps import AdminDepends, UserDepends
+from app.api.deps import AdminDepends, UserDepends, TimeSlotDateRangeDepends
 from app.schemas.room import SRoomOut, SRoomUpdate, SRoomOutWithLocation
-from app.schemas.timeslot import STimeSlotOut, STimeSlotDateRange, STimeSlotOutWithBookingStatus, STimeSlotCreate, \
+from app.schemas.timeslot import STimeSlotOut, STimeSlotOutWithBookingStatus, STimeSlotCreate, \
     SPriceQuoteOut, SPriceQuoteIn
 from app.services.business.rooms import RoomBusinessService
 
@@ -56,10 +55,8 @@ async def delete_room_route(room_id: int, token_data: AdminDepends) -> None:
     description="Return room timeslots by date range", )
 async def get_room_timeslots_route(
         room_id: int,
-        date_from: datetime = Query(...),
-        date_to: datetime | None = Query(None),
+        date_range: TimeSlotDateRangeDepends,
 ) -> List[STimeSlotOutWithBookingStatus]:
-    date_range = STimeSlotDateRange(date_from=date_from, date_to=date_to)
     return await RoomBusinessService().get_timeslots_by_date_range_with_booking_flag(room_id, date_range)
 
 

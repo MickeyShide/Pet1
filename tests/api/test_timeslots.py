@@ -139,6 +139,26 @@ async def test__get_timeslots_by_range_invalid_date_from_returns_422(async_clien
 
 
 @pytest.mark.asyncio
+async def test__get_timeslots_by_range_invalid_date_to_returns_422(async_client):
+    params = {"room_id": 1, "date_from": "2025-01-01T10:00:00Z", "date_to": "bad"}
+    response = await async_client.get("/timeslots", params=params)
+
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_timeslots_by_range_date_to_before_date_from_returns_422(async_client):
+    params = {
+        "room_id": 1,
+        "date_from": "2025-01-02T12:00:00Z",
+        "date_to": "2025-01-01T12:00:00Z",
+    }
+    response = await async_client.get("/timeslots", params=params)
+
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
 async def test__update_timeslot_requires_admin(async_client, db_session, faker):
     location = await create_location(db_session, faker)
     room = await create_room(db_session, faker, location=location)
@@ -159,6 +179,26 @@ async def test__update_timeslot_requires_admin(async_client, db_session, faker):
 
     async_client.app_ref.dependency_overrides.clear()
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test__update_timeslot_requires_auth(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    await db_session.commit()
+
+    response = await async_client.patch(
+        f"/timeslots/{slot.id}",
+        json={"base_price": 500},
+    )
+
+    assert response.status_code == 401
 
 
 @pytest.mark.asyncio
@@ -188,6 +228,53 @@ async def test__update_timeslot_with_admin(async_client, db_session, faker):
 
 
 @pytest.mark.asyncio
+async def test__update_timeslot_empty_payload_returns_422(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=True)
+
+    response = await async_client.patch(
+        f"/timeslots/{slot.id}",
+        json={},
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__update_timeslot_invalid_status_returns_422(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+        base_price=100,
+    )
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=True)
+
+    response = await async_client.patch(
+        f"/timeslots/{slot.id}",
+        json={"status": "BAD"},
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
 async def test__delete_timeslot_requires_admin(async_client, db_session, faker):
     location = await create_location(db_session, faker)
     room = await create_room(db_session, faker, location=location)
@@ -207,6 +294,21 @@ async def test__delete_timeslot_requires_admin(async_client, db_session, faker):
     assert response.status_code == 403
 
 
+@pytest.mark.asyncio
+async def test__delete_timeslot_requires_auth(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    await db_session.commit()
+
+    response = await async_client.delete(f"/timeslots/{slot.id}")
+
+    assert response.status_code == 401
 @pytest.mark.asyncio
 async def test__delete_timeslot_with_admin(async_client, db_session, faker):
     location = await create_location(db_session, faker)

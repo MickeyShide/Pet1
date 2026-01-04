@@ -30,6 +30,7 @@ class RoomBusinessService(BaseBusinessService):
 
     @new_session()
     async def create_by_location_id(self, location_id: int, room_data: SRoomCreate) -> SRoomOut:
+        await self.location_service.get_one_by_id(location_id)
         room: Room = await self.room_service.create(location_id=location_id, **room_data.to_dict())
         room = await self.room_service.get_one_by_id(room.id)
         return SRoomOut.from_model(room)
@@ -58,6 +59,7 @@ class RoomBusinessService(BaseBusinessService):
             room_id: int,
             date_range: STimeSlotDateRange
     ) -> List[STimeSlotOutWithBookingStatus]:
+        await self.room_service.get_one_by_id(room_id)
 
         cache = CacheService[List[STimeSlotOutWithBookingStatus]](model=STimeSlotOutWithBookingStatus, collection=True)
         cache_key = cache_keys.timeslots_by_room_and_range(
@@ -92,6 +94,7 @@ class RoomBusinessService(BaseBusinessService):
 
     @new_session()
     async def create_timeslot(self, room_id: int, timeslot_data: STimeSlotCreate) -> STimeSlotOut:
+        await self.room_service.get_one_by_id(room_id)
         new_slot = await self.timeslots_service.create(room_id=room_id, **timeslot_data.to_dict())
         await CacheService().delete_pattern(cache_keys.timeslots_room_prefix(room_id))
         return STimeSlotOut.from_model(new_slot)

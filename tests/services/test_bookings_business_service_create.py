@@ -7,7 +7,7 @@ from app.schemas.auth import SAccessToken
 from app.schemas.booking import SBookingCreate
 from app.services.business.bookings import BookingsBusinessService
 from app.models.timeslot import TimeSlotStatus
-from app.utils.err.booking import SlotAlreadyTaken, TimeSlotBlocked
+from app.utils.err.booking import SlotAlreadyTaken, TimeSlotBlocked, TimeSlotNotFound
 from tests.fixtures.factories import (
     create_booking,
     create_location,
@@ -95,3 +95,15 @@ async def test__create_booking__rejects_blocked_timeslot(db_session, faker):
     # When / Then
     with pytest.raises(TimeSlotBlocked):
         await service.create_booking(SBookingCreate(timeslot_id=slot.id))
+
+
+@pytest.mark.asyncio
+async def test__create_booking__raises_when_timeslot_missing(db_session, faker):
+    # Given
+    user = await create_user(db_session, faker)
+    await db_session.commit()
+    service = BookingsBusinessService(token_data=SAccessToken(sub=str(user.id), admin=False))
+
+    # When / Then
+    with pytest.raises(TimeSlotNotFound):
+        await service.create_booking(SBookingCreate(timeslot_id=9999))

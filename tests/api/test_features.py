@@ -146,6 +146,20 @@ async def test__create_feature_invalid_payload_returns_422(async_client, db_sess
 
 
 @pytest.mark.asyncio
+async def test__create_feature_invalid_type_returns_422(async_client, db_session, faker):
+    override_token(async_client.app_ref, admin=True)
+
+    response = await async_client.post(
+        "/features",
+        json={"name": "Bad", "type": "WRONG", "room_id": 1},
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
 async def test__update_feature_requires_admin(async_client, db_session, faker):
     location = await create_location(db_session, faker)
     room = await create_room(db_session, faker, location=location)
@@ -239,6 +253,24 @@ async def test__update_feature_invalid_payload_returns_422(async_client, db_sess
     response = await async_client.patch(
         f"/features/{feature.id}",
         json={"room_id": room.id, "location_id": location.id},
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__update_feature_invalid_type_returns_422(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    feature = await create_feature(db_session, faker, room=room, name="Old")
+    await db_session.commit()
+    override_token(async_client.app_ref, admin=True)
+
+    response = await async_client.patch(
+        f"/features/{feature.id}",
+        json={"type": "BAD"},
         headers=auth_header(),
     )
 

@@ -11,7 +11,7 @@ from app.models.room import TimeSlotType
 from app.schemas.room import SRoomCreate, SRoomUpdate
 from app.schemas.timeslot import STimeSlotCreate, STimeSlotDateRange
 from app.services.business.rooms import RoomBusinessService
-from app.utils.err.room import NotFlexibleTimeslotsType
+from app.utils.err.room import NotFlexibleTimeslotsType, InvalidBookingDuration
 from tests.fixtures.factories import (
     create_booking,
     create_location,
@@ -267,3 +267,115 @@ async def test__get_price_quote__fixed_raises_conflict(db_session, faker):
     # When / Then
     with pytest.raises(NotFlexibleTimeslotsType):
         await service.get_price_quote(room.id, start, end)
+
+
+@pytest.mark.asyncio
+async def test__get_price_quote__rejects_too_short_duration(db_session, faker):
+    # Given
+    location = await create_location(db_session, faker)
+    room = await create_room(
+        db_session,
+        faker,
+        location=location,
+        hour_price=Decimal("100.00"),
+        min_booking_duration_minutes=120,
+        booking_step_minutes=30,
+    )
+    await db_session.commit()
+    service = RoomBusinessService()
+    start = datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)
+    end = start + timedelta(minutes=60)
+
+    # When / Then
+    with pytest.raises(InvalidBookingDuration):
+        await service.get_price_quote(room.id, start, end)
+
+
+@pytest.mark.asyncio
+async def test__get_price_quote__rejects_unaligned_start(db_session, faker):
+    # Given
+    location = await create_location(db_session, faker)
+    room = await create_room(
+        db_session,
+        faker,
+        location=location,
+        hour_price=Decimal("100.00"),
+        min_booking_duration_minutes=60,
+        booking_step_minutes=30,
+    )
+    await db_session.commit()
+    service = RoomBusinessService()
+    start = datetime(2024, 1, 1, 10, 10, tzinfo=timezone.utc)
+    end = start + timedelta(hours=1)
+
+    # When / Then
+    with pytest.raises(InvalidBookingDuration):
+        await service.get_price_quote(room.id, start, end)
+
+
+@pytest.mark.asyncio
+async def test__get_price_quote__rejects_unaligned_duration(db_session, faker):
+    # Given
+    location = await create_location(db_session, faker)
+    room = await create_room(
+        db_session,
+        faker,
+        location=location,
+        hour_price=Decimal("100.00"),
+        min_booking_duration_minutes=60,
+        booking_step_minutes=30,
+    )
+    await db_session.commit()
+    service = RoomBusinessService()
+    start = datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)
+    end = start + timedelta(minutes=45)
+
+    # When / Then
+    with pytest.raises(InvalidBookingDuration):
+        await service.get_price_quote(room.id, start, end)
+
+
+@pytest.mark.asyncio
+async def test__get_price_quote__rejects_seconds(db_session, faker):
+    # Given
+    location = await create_location(db_session, faker)
+    room = await create_room(
+        db_session,
+        faker,
+        location=location,
+        hour_price=Decimal("100.00"),
+        min_booking_duration_minutes=60,
+        booking_step_minutes=30,
+    )
+    await db_session.commit()
+    service = RoomBusinessService()
+    start = datetime(2024, 1, 1, 10, 0, 30, tzinfo=timezone.utc)
+    end = start + timedelta(hours=1)
+
+    # When / Then
+    with pytest.raises(InvalidBookingDuration):
+        await service.get_price_quote(room.id, start, end)
+
+
+@pytest.mark.asyncio
+async def test__get_price_quote__allows_step_over_hour(db_session, faker):
+    # Given
+    location = await create_location(db_session, faker)
+    room = await create_room(
+        db_session,
+        faker,
+        location=location,
+        hour_price=Decimal("100.00"),
+        min_booking_duration_minutes=90,
+        booking_step_minutes=90,
+    )
+    await db_session.commit()
+    service = RoomBusinessService()
+    start = datetime(2024, 1, 1, 1, 30, tzinfo=timezone.utc)
+    end = start + timedelta(minutes=90)
+
+    # When
+    result = await service.get_price_quote(room.id, start, end)
+
+    # Then
+    assert result.price == Decimal("150.00")

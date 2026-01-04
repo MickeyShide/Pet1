@@ -11,6 +11,8 @@ from app.schemas.auth import (
     SRefreshToken,
 )
 from app.services.business.auth import AuthBusinessService
+from app.utils.cache.cache_service import CacheService
+from app.utils.err.auth import TooManyAttempts
 from app.utils.err.base.unauthorized import UnauthorizedException
 from app.utils.security import create_refresh_token
 from tests.fixtures.factories import create_user
@@ -74,6 +76,28 @@ async def test__login__returns_access_token_and_sets_cookie(db_session, faker):
     assert token_out.access_token
     cookie_header = response.headers.get("set-cookie")
     assert cookie_header and "refresh_token=" in cookie_header
+
+
+@pytest.mark.asyncio
+async def test__login__too_many_attempts_raises(monkeypatch):
+    async def _fake_try_get(self, key, default=None):
+        return 5
+
+    async def _fake_try_set(self, key, value, ttl=None):
+        return None
+
+    monkeypatch.setattr(CacheService, "try_get", _fake_try_get)
+    monkeypatch.setattr(CacheService, "try_set", _fake_try_set)
+    service = AuthBusinessService()
+    request = Request({"type": "http", "headers": [(b"x-real-ip", b"1.2.3.4")]})
+    response = Response()
+
+    with pytest.raises(TooManyAttempts):
+        await service.login(
+            request,
+            response,
+            SLogin(email="user@example.com", password="pass"),
+        )
 
 
 @pytest.mark.asyncio

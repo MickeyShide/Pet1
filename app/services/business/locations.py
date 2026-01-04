@@ -59,5 +59,6 @@ class LocationBusinessService(BaseBusinessService):
 
     @new_session(readonly=True)
     async def get_rooms_by_location_id(self, location_id: int) -> List[SRoomOut]:
+        await self.location_service.get_one_by_id(location_id)
         rooms: List[Room] = await self.room_service.find_all_by_filters(location_id=location_id)
         return [SRoomOut.from_model(room) for room in rooms]

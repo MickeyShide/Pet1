@@ -1,12 +1,16 @@
 # app/api/deps.py
+from datetime import datetime
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Query
+from fastapi.exceptions import RequestValidationError
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt, JWTError
+from pydantic import ValidationError
 
 from app.config import settings
 from app.schemas.auth import SAccessToken
+from app.schemas.timeslot import STimeSlotDateRange
 from app.utils.err.base.forbidden import ForbiddenException
 from app.utils.err.base.unauthorized import UnauthorizedException
 
@@ -43,3 +47,16 @@ async def get_admin_token_data(token: SAccessToken = Depends(get_token_data)) ->
 UserDepends = Annotated[SAccessToken, Depends(get_token_data)]
 
 AdminDepends = Annotated[SAccessToken, Depends(get_admin_token_data)]
+
+
+def _build_timeslot_date_range(
+    date_from: datetime = Query(...),
+    date_to: datetime | None = Query(None),
+) -> STimeSlotDateRange:
+    try:
+        return STimeSlotDateRange(date_from=date_from, date_to=date_to)
+    except ValidationError as exc:
+        raise RequestValidationError(exc.errors()) from exc
+
+
+TimeSlotDateRangeDepends = Annotated[STimeSlotDateRange, Depends(_build_timeslot_date_range)]

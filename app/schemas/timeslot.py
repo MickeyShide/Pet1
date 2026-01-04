@@ -62,6 +62,8 @@ class STimeSlotDateRange(BaseSchema):
                 999_999,
                 tzinfo=tz,
             )
+        if self.date_to < self.date_from:
+            raise ValueError("date_to must be >= date_from")
         return self
 
 

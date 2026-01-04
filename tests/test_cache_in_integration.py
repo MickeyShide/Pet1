@@ -25,6 +25,7 @@ async def async_client(fastapi_app_cache):
     transport = ASGITransport(app=fastapi_app_cache, raise_app_exceptions=True)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         client.app_ref = fastapi_app_cache
+        client.app_ref.dependency_overrides.clear()
         yield client
 
 

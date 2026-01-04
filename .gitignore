@@ -4760,3 +4760,6 @@ __pycache__/
 /.venv/lib64/
 /.venv/pyvenv.cfg
 /.idea/Pet1.iml
+/alembic.autotests.ini
+/alembic.local.ini
+/alembic.prod.ini

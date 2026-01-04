@@ -20,3 +20,8 @@ class BookingNotFound(NotFoundException):
 class TimeSlotBlocked(ConflictException):
     def __init__(self):
         super().__init__("Timeslot is blocked")
+
+
+class BookingNotPayable(ConflictException):
+    def __init__(self, detail: str = "Booking cannot be paid"):
+        super().__init__(detail)
