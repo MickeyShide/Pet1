@@ -50,6 +50,41 @@ services:
     networks:
       - local-net
 
+  minio:
+    image: minio/minio:latest
+    container_name: fastapi_pet1-minio-local
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web UI
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio-data-local:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - local-net
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: fastapi_pet1-minio-init-local
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin} &&
+      mc mb -p local/${S3_BUCKET:-uploads} || true &&
+      mc anonymous set download local/${S3_BUCKET:-uploads} || true
+      "
+    networks:
+      - local-net
+
   backend:
     build:
       context: ../
@@ -62,18 +97,27 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
       COOKIE_SECURE: ${COOKIE_SECURE:-1}
+
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_DB: ${REDIS_DB:-0}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       REDIS_CACHE_PREFIX: ${REDIS_CACHE_PREFIX:-myapp:cache:}
+
       RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
       RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
       RABBITMQ_USER: ${RABBITMQ_USER:-app}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-app}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-}
-      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-}
+
+      # MinIO / S3
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-http://minio:9000}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+      S3_BUCKET: ${S3_BUCKET:-uploads}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_PUBLIC_BASE_URL: ${S3_PUBLIC_BASE_URL:-http://localhost:9000}
+
     ports:
       - "4004:4000"
     depends_on:
@@ -82,6 +126,8 @@ services:
       redis:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     volumes:
       - ../:/var/www
@@ -104,32 +150,38 @@ services:
       - --loglevel=info
       - -Q
       - default
-    command: []
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://app:app@db/fastapi_pet_1}
       SECRET_KEY: ${SECRET_KEY:-abcdefg}
       ALGORITHM: ${ALGORITHM:-HS256}
-      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
-      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
-      COOKIE_SECURE: ${COOKIE_SECURE:-1}
+
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_DB: ${REDIS_DB:-0}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      REDIS_CACHE_PREFIX: ${REDIS_CACHE_PREFIX:-myapp:cache:}
+
       RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
       RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
       RABBITMQ_USER: ${RABBITMQ_USER:-app}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-app}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-}
-      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-}
+
+      # MinIO / S3
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-http://minio:9000}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+      S3_BUCKET: ${S3_BUCKET:-uploads}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_PUBLIC_BASE_URL: ${S3_PUBLIC_BASE_URL:-http://localhost:9000}
+
     depends_on:
       db:
         condition: service_started
       redis:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     networks:
       - local-net
@@ -141,3 +193,4 @@ volumes:
   db-data-local:
   redis-data-local:
   rabbitmq-data-local:
+  minio-data-local:

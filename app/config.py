@@ -35,6 +35,14 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = ""
     CELERY_RESULT_BACKEND: str = ""
 
+    # S3 / MinIO
+    S3_ENDPOINT_URL: str = "http://localhost:9000"
+    S3_PUBLIC_BASE_URL: str = "http://localhost:9000"
+    S3_ACCESS_KEY: str = "minioadmin"
+    S3_SECRET_KEY: str = "minioadmin"
+    S3_BUCKET: str = "uploads"
+    S3_REGION: str = "us-east-1"
+
     # Domain settings
     BOOKING_EXPIRE_SECONDS: int = 20
     LOCATION_CACHE_TTL_SECONDS: int = 6
