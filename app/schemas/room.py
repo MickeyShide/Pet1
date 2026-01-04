@@ -58,3 +58,4 @@ class SRoomUpdate(BaseSchema):
         payload = self.model_dump(exclude_unset=True)
         if not payload:
             raise ValueError("At least one field must be provided")
+        return self
