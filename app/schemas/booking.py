@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from app.models.booking import BookingStatus
 from app.schemas import BaseSchema
+from app.schemas.room import SRoomOut
 from app.schemas.timeslot import STimeSlotOut
 
 
@@ -19,6 +20,7 @@ class SBookingBase(BaseSchema):
 
 class SBookingOut(SBookingBase):
     id: int
+    room: SRoomOut
 
 
 class SBookingOutAfterCreate(BaseSchema):

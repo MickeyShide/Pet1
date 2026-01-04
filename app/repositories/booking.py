@@ -1,8 +1,9 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import select, update
+from sqlalchemy.orm import selectinload
 
-from app.models import Booking, TimeSlot
+from app.models import Booking, Room, TimeSlot
 from app.models.booking import BookingStatus
 from app.repositories.base import BaseRepository
 from app.schemas.booking import SBookingFilters
@@ -22,6 +23,7 @@ class BookingRepository(BaseRepository[Booking]):
             select(self._model_cls, TimeSlot)
             .join(TimeSlot, self._model_cls.timeslot_id == TimeSlot.id)
             .where(self._model_cls.user_id == user_id)
+            .options(selectinload(self._model_cls.room).selectinload(Room.features))
         )
 
         if booking_filters is not None:
@@ -51,6 +53,7 @@ class BookingRepository(BaseRepository[Booking]):
             select(self._model_cls, TimeSlot)
             .join(TimeSlot, self._model_cls.timeslot_id == TimeSlot.id)
             .where(self._model_cls.id == booking_id)
+            .options(selectinload(self._model_cls.room).selectinload(Room.features))
         )
 
         if not is_admin:

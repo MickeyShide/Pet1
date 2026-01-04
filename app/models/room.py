@@ -23,6 +23,7 @@ class TimeSlotType(str, Enum):
 if TYPE_CHECKING:
     from app.models.location import Location
     from app.models.feature import Feature
+    from app.models.booking import Booking
 
 
 class Room(BaseSQLModel, table=True):
@@ -70,3 +71,4 @@ class Room(BaseSQLModel, table=True):
     is_active: bool
 
     features: list["Feature"] = Relationship(back_populates="room")
+    bookings: list["Booking"] = Relationship(back_populates="room")

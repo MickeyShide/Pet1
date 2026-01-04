@@ -1,10 +1,11 @@
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
+from typing import Optional
 
 from sqlalchemy import Enum as SAEnum, Index, text
 from sqlalchemy import TIMESTAMP, DECIMAL
-from sqlmodel import Field
+from sqlmodel import Field, Relationship
 
 from .base import BaseSQLModel
 
@@ -33,6 +34,8 @@ class Booking(BaseSQLModel, table=True):
     paid_at: datetime | None = Field(sa_type=TIMESTAMP(timezone=True), nullable=True)
     canceled_at: datetime | None = Field(sa_type=TIMESTAMP(timezone=True), nullable=True)
     expires_at: datetime = Field(sa_type=TIMESTAMP(timezone=True), nullable=False)
+
+    room: Optional["Room"] = Relationship(back_populates="bookings")
 
     __table_args__ = (
         Index(
