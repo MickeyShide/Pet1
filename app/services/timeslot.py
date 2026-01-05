@@ -6,7 +6,7 @@ from app.models import TimeSlot
 from app.models.timeslot import TimeSlotStatus
 from app.repositories.timeslot import TimeSlotRepository
 from app.services.base import BaseService
-from app.utils.err.booking import TimeSlotNotFound, SlotAlreadyTaken, TimeSlotBlocked
+from app.utils.err.booking import TimeSlotNotFound, SlotAlreadyTaken, TimeSlotBlocked, TimeSlotCancelled
 
 
 class TimeSlotService(BaseService[TimeSlot]):
@@ -40,7 +40,10 @@ class TimeSlotService(BaseService[TimeSlot]):
         if has_active_booking:
             raise SlotAlreadyTaken()
 
-        if timeslot.status != TimeSlotStatus.AVAILABLE:
+        if timeslot.status == TimeSlotStatus.BLOCKED:
             raise TimeSlotBlocked()
+
+        if timeslot.status == TimeSlotStatus.CANCELED:
+            raise TimeSlotCancelled()
 
         return timeslot

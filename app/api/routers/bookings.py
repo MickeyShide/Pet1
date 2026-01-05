@@ -5,8 +5,13 @@ from starlette import status
 
 from app.api.deps import UserDepends
 from app.models.booking import BookingStatus
-from app.schemas.booking import SBookingCreate, SBookingOutAfterCreate, SBookingOutWithTimeslots, \
-    SBookingFilters
+from app.schemas.booking import (
+    SBookingCreate,
+    SBookingOutAfterCreate,
+    SBookingOutWithTimeslots,
+    SBookingFilters,
+    SBookingCreateFlexible,
+)
 from app.schemas.payment import SPaymentOut
 from app.schemas.timeslot import STimeSlotFilters
 from app.services.business.bookings import BookingsBusinessService
@@ -26,6 +31,18 @@ async def create_booking_route(
         token_data: UserDepends
 ) -> SBookingOutAfterCreate:
     return await BookingsBusinessService(token_data=token_data).create_booking(booking_data)
+
+@router.post(
+    path="/flexible",
+    status_code=status.HTTP_201_CREATED,
+    response_model=SBookingOutWithTimeslots,
+    description="Create a new booking",
+)
+async def create_booking_flexible_route(
+        booking_data: SBookingCreateFlexible,
+        token_data: UserDepends
+) -> SBookingOutWithTimeslots:
+    return await BookingsBusinessService(token_data=token_data).create_booking_flexible(booking_data)
 
 
 @router.get(

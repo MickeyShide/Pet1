@@ -30,6 +30,7 @@ class TimeSlot(BaseSQLModel, table=True):
         sa_type=SAEnum(TimeSlotStatus, name="timeslotstatus"),
         default=TimeSlotStatus.AVAILABLE,
         nullable=False,
+        sa_column_kwargs={"server_default": text("'AVAILABLE'")},
     )
 
     __table_args__ = (

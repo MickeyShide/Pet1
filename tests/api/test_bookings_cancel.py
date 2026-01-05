@@ -181,11 +181,13 @@ async def test__cancel_booking_endpoint__allows_rebooking_same_slot(async_client
     override_token(async_client.app_ref, token)
     location = await create_location(db_session, faker)
     room = await create_room(db_session, faker, location=location)
+    start = datetime.now(timezone.utc)
+    end = start + timedelta(hours=1)
     slot = await create_timeslot(
         db_session,
         room=room,
-        start_datetime=datetime.now(timezone.utc),
-        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+        start_datetime=start,
+        end_datetime=end,
     )
     booking = await create_booking(
         db_session,
@@ -209,15 +211,29 @@ async def test__cancel_booking_endpoint__allows_rebooking_same_slot(async_client
         json={"timeslot_id": slot.id},
         headers={"Authorization": "Bearer test"},
     )
+    assert rebook_response.status_code == 409, rebook_response.text
+
+    new_slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start,
+        end_datetime=end,
+    )
+    await db_session.commit()
+
+    rebook_new_response = await async_client.post(
+        "/bookings",
+        json={"timeslot_id": new_slot.id},
+        headers={"Authorization": "Bearer test"},
+    )
 
     async_client.app_ref.dependency_overrides.clear()
-    # ❗BUG FOUND: After cancellation the slot still fails the unique constraint (SQLite ignores the partial index), so rebooking currently crashes.
-    assert rebook_response.status_code == 201, rebook_response.text
-    new_booking_id = rebook_response.json()["id"]
+    assert rebook_new_response.status_code == 201, rebook_new_response.text
+    new_booking_id = rebook_new_response.json()["id"]
     assert new_booking_id != booking.id
     stored_booking = await db_session.get(Booking, new_booking_id)
     assert stored_booking is not None
-    assert stored_booking.timeslot_id == slot.id
+    assert stored_booking.timeslot_id == new_slot.id
 
 
 @pytest.mark.asyncio

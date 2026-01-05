@@ -5,7 +5,7 @@ import pytest
 from app.models.booking import BookingStatus
 from app.services.timeslot import TimeSlotService
 from app.models.timeslot import TimeSlotStatus
-from app.utils.err.booking import SlotAlreadyTaken, TimeSlotNotFound, TimeSlotBlocked
+from app.utils.err.booking import SlotAlreadyTaken, TimeSlotNotFound, TimeSlotBlocked, TimeSlotCancelled
 from tests.fixtures.factories import (
     create_booking,
     create_location,
@@ -125,5 +125,5 @@ async def test__lock_time_slot_for_booking__rejects_canceled_timeslot(db_session
     service = TimeSlotService(db_session)
 
     # When / Then
-    with pytest.raises(TimeSlotBlocked):
+    with pytest.raises(TimeSlotCancelled):
         await service.lock_time_slot_for_booking(slot.id)

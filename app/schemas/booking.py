@@ -39,6 +39,11 @@ class SBookingOutWithTimeslots(BaseSchema):
 class SBookingCreate(BaseSchema):
     timeslot_id: int
 
+class SBookingCreateFlexible(BaseSchema):
+    room_id: int
+    start_datetime: datetime
+    end_datetime: datetime
+
 
 class SBookingFilters(BaseSchema):
     room_id: int | None = None

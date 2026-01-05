@@ -4,7 +4,7 @@ import pytest
 from fakeredis.aioredis import FakeRedis
 
 from app.schemas.auth import SAccessToken
-from app.schemas.booking import SBookingCreate
+from app.schemas.booking import SBookingCreate, SBookingCreateFlexible
 from app.utils.cache import CacheService, keys as cache_keys
 from app.utils.err.base.not_found import NotFoundException
 from app.services.business.bookings import BookingsBusinessService
@@ -52,6 +52,29 @@ async def test_create_booking_invalidates_timeslot_cache(fake_redis, db_session,
 
     service = BookingsBusinessService(token_data=token)
     await service.create_booking(SBookingCreate(timeslot_id=slot.id))
+
+    assert await cache.get(warm_key) is None
+
+
+@pytest.mark.asyncio
+async def test_create_booking_flexible_invalidates_timeslot_cache(fake_redis, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    start = datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)
+    end = start + timedelta(hours=1)
+    await db_session.commit()
+
+    cache = CacheService()
+    warm_key = cache_keys.timeslots_by_room_and_range(room.id, start, end)
+    await cache.set(warm_key, {"cached": True})
+    assert await cache.get(warm_key) is not None
+
+    service = BookingsBusinessService(token_data=token)
+    await service.create_booking_flexible(
+        SBookingCreateFlexible(room_id=room.id, start_datetime=start, end_datetime=end)
+    )
 
     assert await cache.get(warm_key) is None
 

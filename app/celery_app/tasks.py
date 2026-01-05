@@ -4,11 +4,14 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import update
+from sqlalchemy import select, update
 
 from app.celery_app.app import celery_app
 from app.db import base as db_base
+from app.models import Room, TimeSlot
 from app.models.booking import Booking, BookingStatus
+from app.models.room import TimeSlotType
+from app.models.timeslot import TimeSlotStatus
 from app.utils.cache import keys as cache_keys
 from app.utils.cache.cache_service import CacheService
 
@@ -17,6 +20,7 @@ async def _expire_booking(booking_id: int) -> dict[str, Any]:
     """
     Async logic for expiring a booking:
     - if status is PENDING_PAYMENTS and expires_at <= now -> set EXPIRED
+    - cancel timeslot for flexible rooms
     - invalidate timeslot cache for the room
     - enqueue notification
     """
@@ -34,7 +38,7 @@ async def _expire_booking(booking_id: int) -> dict[str, Any]:
                 .where(Booking.status == BookingStatus.PENDING_PAYMENTS)
                 .where(Booking.expires_at <= datetime.now(timezone.utc))
                 .values(status=BookingStatus.EXPIRED)
-                .returning(Booking.id, Booking.room_id, Booking.status)
+                .returning(Booking.id, Booking.room_id, Booking.timeslot_id, Booking.status)
             )
             res = await session.execute(stmt)
             row = res.one_or_none()
@@ -42,8 +46,19 @@ async def _expire_booking(booking_id: int) -> dict[str, Any]:
                 await session.rollback()
                 return {"booking_id": booking_id, "status": "skipped_not_pending_or_not_expired"}
 
+            booking_id_db, room_id, timeslot_id, status = row
+            room_type_res = await session.execute(
+                select(Room.time_slot_type).where(Room.id == room_id)
+            )
+            room_time_slot_type = room_type_res.scalar_one_or_none()
+            if room_time_slot_type == TimeSlotType.FLEXIBLE:
+                await session.execute(
+                    update(TimeSlot)
+                    .where(TimeSlot.id == timeslot_id)
+                    .values(status=TimeSlotStatus.CANCELED)
+                )
+
             await session.commit()
-            booking_id_db, room_id, status = row
 
             # Invalidate cached timeslots for the room
             await CacheService().delete_pattern(cache_keys.timeslots_room_prefix(room_id))

@@ -21,6 +21,10 @@ class TimeSlotBlocked(ConflictException):
     def __init__(self):
         super().__init__("Timeslot is blocked")
 
+class TimeSlotCancelled(ConflictException):
+    def __init__(self):
+        super().__init__("Timeslot is cancelled")
+
 
 class BookingNotPayable(ConflictException):
     def __init__(self, detail: str = "Booking cannot be paid"):

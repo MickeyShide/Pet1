@@ -4,7 +4,6 @@ from typing import List
 from app.config import settings
 from app.db.base import new_session
 from app.models import Room
-from app.models.room import TimeSlotType
 from app.schemas.room import SRoomOut, SRoomCreate, SRoomUpdate, SRoomOutWithLocation
 from app.schemas.timeslot import STimeSlotDateRange, STimeSlotOutWithBookingStatus, STimeSlotCreate, STimeSlotOut, \
     SPriceQuoteOut
@@ -14,7 +13,6 @@ from app.services.room import RoomService
 from app.services.timeslot import TimeSlotService
 from app.utils.cache import keys as cache_keys
 from app.utils.cache.cache_service import CacheService
-from app.utils.err.room import NotFlexibleTimeslotsType, InvalidBookingDuration
 
 
 class RoomBusinessService(BaseBusinessService):
@@ -102,37 +100,14 @@ class RoomBusinessService(BaseBusinessService):
     @new_session(readonly=True)
     async def get_price_quote(self, room_id: int, date_from: datetime, date_to: datetime) -> SPriceQuoteOut:
 
-        # проверяем что рума поддерживает кастомные таймслоты
-        room: Room = await self.room_service.get_one_by_id(room_id)
-        if room.time_slot_type != TimeSlotType.FLEXIBLE:
-            raise NotFlexibleTimeslotsType()
+        room = await self.room_service.get_one_by_id(room_id)
 
-        # проверяем что длительность стакается с min_booking_duration_minutes и booking_step_minutes
-        min_minutes = room.min_booking_duration_minutes
-        step_minutes = room.booking_step_minutes
-        start_minute_of_day = date_from.hour * 60 + date_from.minute
-        delta = date_to - date_from
-        duration_minutes = delta.days * 24 * 60 + delta.seconds // 60
-
-        if (
-                # 1. тайм не выровнен по минутам
-                date_from.second != 0
-                or date_from.microsecond != 0
-                or date_to.second != 0
-                or date_to.microsecond != 0
-                or delta.microseconds != 0
-                or delta.seconds % 60 != 0
-                or
-                # 2. длительность меньше минимальной
-                duration_minutes < min_minutes
-                or
-                # 3. старт не по сетке шага (запрет 00:13 при шаге 15)
-                start_minute_of_day % step_minutes != 0
-                or
-                # 4. длительность не кратна шагу
-                duration_minutes % step_minutes != 0
-        ):
-            raise InvalidBookingDuration(min_minutes=min_minutes, step_minutes=step_minutes)
+        # checks: timeslot type IS flexible, timeslot datetimes is correct
+        await self.room_service.check_flexible_booking(
+            room=room,
+            start_datetime=date_from,
+            end_datetime=date_to
+        )
 
         price = await self.room_service.get_price_quote(room_id, date_from, date_to)
 
