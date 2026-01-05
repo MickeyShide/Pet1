@@ -102,3 +102,45 @@ async def test_expire_booking_does_not_cancel_fixed_timeslot(db_session, session
     assert str(status_value).endswith("EXPIRED")
     await db_session.refresh(timeslot)
     assert timeslot.status == TimeSlotStatus.AVAILABLE
+
+
+@pytest.mark.asyncio
+async def test_expire_booking_skipped_when_no_engine(monkeypatch):
+    monkeypatch.setattr(tasks.db_base, "async_session_maker", None, raising=False)
+    monkeypatch.setattr(tasks.db_base, "init_engine", lambda echo=False: None)
+
+    result = await tasks._expire_booking(123)
+
+    assert result["status"] == "skipped_no_engine"
+
+
+@pytest.mark.asyncio
+async def test_expire_booking_returns_error_on_cache_failure(db_session, session_maker, faker, monkeypatch):
+    async def fake_delete_pattern(self, pattern: str):
+        raise RuntimeError("cache down")
+
+    monkeypatch.setattr(tasks.CacheService, "delete_pattern", fake_delete_pattern, raising=False)
+    monkeypatch.setattr(tasks, "async_session_maker", session_maker, raising=False)
+
+    user = await factories.create_user(db_session, faker)
+    location = await factories.create_location(db_session, faker)
+    room = await factories.create_room(db_session, faker, location=location)
+    timeslot = await factories.create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc) - timedelta(hours=2),
+        end_datetime=datetime.now(timezone.utc) - timedelta(hours=1),
+    )
+    booking = await factories.create_booking(
+        db_session,
+        user=user,
+        room=room,
+        timeslot=timeslot,
+        expires_delta=timedelta(minutes=-1),
+    )
+    await db_session.commit()
+
+    result = await tasks._expire_booking(booking.id)
+
+    assert result["status"] == "error"
+    assert "cache down" in result["detail"]

@@ -9,8 +9,9 @@ from app.models.booking import BookingStatus
 from app.models.timeslot import TimeSlotStatus
 from app.models.room import TimeSlotType
 from app.schemas.room import SRoomCreate, SRoomUpdate
-from app.schemas.timeslot import STimeSlotCreate, STimeSlotDateRange
+from app.schemas.timeslot import STimeSlotCreate, STimeSlotDateRange, STimeSlotOutWithBookingStatus
 from app.services.business.rooms import RoomBusinessService
+from app.services.business import rooms as rooms_module
 from app.utils.err.room import NotFlexibleTimeslotsType, InvalidBookingDuration
 from tests.fixtures.factories import (
     create_booking,
@@ -184,6 +185,51 @@ async def test__get_timeslots_by_date_range_with_booking_flag__excludes_canceled
     ids = {item.id for item in result}
     assert slot_available.id in ids
     assert slot_canceled.id not in ids
+
+
+@pytest.mark.asyncio
+async def test__get_timeslots_by_date_range_with_booking_flag__uses_cache(monkeypatch, db_session, faker):
+    # Given
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    await db_session.commit()
+    service = RoomBusinessService()
+    start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    end = start + timedelta(hours=1)
+    cached = [
+        STimeSlotOutWithBookingStatus(
+            id=1,
+            room_id=room.id,
+            start_datetime=start,
+            end_datetime=end,
+            base_price=Decimal("100.00"),
+            status=TimeSlotStatus.AVAILABLE,
+            has_active_booking=False,
+        )
+    ]
+
+    async def fake_try_get(self, key: str, default=None):
+        return cached
+
+    async def fake_try_set(self, key: str, value, ttl=None):
+        raise AssertionError("should not populate cache when hit exists")
+
+    class StubTimeslotService:
+        async def get_all_by_room_id_and_date_range(self, *args, **kwargs):
+            raise AssertionError("should not query timeslots when cache hit exists")
+
+    monkeypatch.setattr(rooms_module.CacheService, "try_get", fake_try_get, raising=False)
+    monkeypatch.setattr(rooms_module.CacheService, "try_set", fake_try_set, raising=False)
+    service.timeslots_service = StubTimeslotService()
+
+    # When
+    result = await service.get_timeslots_by_date_range_with_booking_flag(
+        room.id,
+        STimeSlotDateRange(date_from=start, date_to=end),
+    )
+
+    # Then
+    assert result == cached
 
 
 @pytest.mark.asyncio

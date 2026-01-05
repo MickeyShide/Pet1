@@ -29,6 +29,19 @@ async def test_cache_service_model_roundtrip(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_cache_service_collection_roundtrip(monkeypatch):
+    redis = FakeRedis(decode_responses=True)
+    cache = CacheService[list[DummySchema]](model=DummySchema, collection=True, redis_client=redis, prefix="cache:")
+
+    payload = [DummySchema(name="one"), DummySchema(name="two")]
+    await cache.set("items", payload)
+
+    restored = await cache.get("items")
+    assert isinstance(restored, list)
+    assert [item.name for item in restored] == ["one", "two"]
+
+
+@pytest.mark.asyncio
 async def test_cache_service_collection_requires_list():
     cache = CacheService[DummySchema](model=DummySchema, collection=True, redis_client=FakeRedis(decode_responses=True))
 
