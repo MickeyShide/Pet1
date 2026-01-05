@@ -97,6 +97,9 @@ def test_main_dunder_main_runs_uvicorn(monkeypatch):
     fake_uvicorn = types.SimpleNamespace(run=fake_run)
     monkeypatch.setitem(sys.modules, "uvicorn", fake_uvicorn)
 
+    # Avoid runpy warning when app.main is already imported in this module.
+    sys.modules.pop("app.main", None)
+
     runpy.run_module("app.main", run_name="__main__")
 
     assert called["app"] == "main:app"

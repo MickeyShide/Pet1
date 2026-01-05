@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, field_serializer
 from sqlalchemy import Identity, TIMESTAMP, func
 from sqlmodel import Field, SQLModel
 
@@ -33,7 +33,10 @@ class BaseSQLModel(SQLModel):
         },
     )
 
-    model_config = ConfigDict(
-        from_attributes=True,
-        json_encoders={Decimal: str},  # или float
-    )
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("*", when_used="json")
+    def _serialize_decimal(self, value):
+        if isinstance(value, Decimal):
+            return str(value)
+        return value

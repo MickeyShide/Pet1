@@ -35,7 +35,7 @@ class FeatureBusinessService(BaseBusinessService):
         fields_set = feature_data.model_fields_set
         if not fields_set:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="No fields provided for update",
             )
 
@@ -46,13 +46,13 @@ class FeatureBusinessService(BaseBusinessService):
         if new_type == FeatureType.ROOM:
             if new_room_id is None or new_location_id is not None:
                 raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                     detail="ROOM feature requires room_id and no location_id",
                 )
         if new_type == FeatureType.LOCATION:
             if new_location_id is None or new_room_id is not None:
                 raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                     detail="LOCATION feature requires location_id and no room_id",
                 )
 
