@@ -4,8 +4,10 @@ from fastapi import APIRouter
 from starlette import status
 
 from app.api.deps import AdminDepends
+from app.schemas.image import SImageUploadIn, SImagePresignOut
 from app.schemas.location import SLocationOut, SLocationCreate, SLocationUpdate
 from app.schemas.room import SRoomOut, SRoomCreate
+from app.services.business.images import ImageBusinessService
 from app.services.business.locations import LocationBusinessService
 from app.services.business.rooms import RoomBusinessService
 
@@ -75,3 +77,17 @@ async def get_all_rooms_by_location_id_route(location_id: int) -> List[SRoomOut]
 )
 async def create_room_route(location_id: int, room_data: SRoomCreate, token_data: AdminDepends) -> SRoomOut:
     return await RoomBusinessService().create_by_location_id(location_id, room_data)
+
+
+@router.post(
+    path="/{location_id}/upload_image",
+    response_model=SImagePresignOut,
+    status_code=status.HTTP_200_OK,
+    description="Upload image for location via presigned URL",
+)
+async def upload_location_image(
+        location_id: int,
+        payload: SImageUploadIn,
+        token_data: AdminDepends,
+) -> SImagePresignOut:
+    return await ImageBusinessService(token_data=token_data).upload_location_image(location_id, payload)
