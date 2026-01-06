@@ -14,7 +14,6 @@ class SRoomBase(BaseSchema):
     capacity: int
     description: str
     type: RoomType | None
-    image_id: int | None
     time_slot_type: TimeSlotType
     min_booking_duration_minutes: int
     booking_step_minutes: int

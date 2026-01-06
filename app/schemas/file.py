@@ -16,6 +16,7 @@ class SFileInitUploadIn(BaseSchema):
     size_bytes: int | None = None
     checksum_sha256: str | None = None
     mode: UploadType
+    is_public: bool = False
 
 class SFileUploadInstruction(BaseSchema):
     url: str
@@ -34,6 +35,7 @@ class SFileInitUploadOut(BaseSchema):
     bucket: str
     object_key: str
     upload: SFileUploadInstruction
+    public_url: str | None = None
 
 class SFileCompleteUploadIn(BaseSchema):
     etag: str | None = None
@@ -50,3 +52,5 @@ class SFileOut(BaseSchema):
     checksum_sha256: str | None
     status: FileStatus
     meta: dict
+    is_public: bool
+    public_url: str | None = None

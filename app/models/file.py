@@ -33,6 +33,7 @@ class File(BaseSQLModel, table=True):
         sa_type=SAEnum(FileStatus, name="pet1_filestatus")
     )
     is_public: bool = Field(default=False, nullable=False) # server_default = false is migration
+    public_url: str | None = None
     meta: dict = Field(
         default_factory=dict,
         sa_column=Column(JSONB, nullable=False),

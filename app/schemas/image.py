@@ -10,13 +10,16 @@ class SImageBase(BaseSchema):
 
 class SImageOut(SImageBase):
     id: int
+    file_id: int
+    room_id: int | None = None
+    location_id: int | None = None
 
 
-class SImagePresignIn(BaseSchema):
-    type: ImageType
+class SImageUploadIn(BaseSchema):
     mime: str
     ext: str
     size: int
+    original_name: str | None = None
 
 
 class SImagePresignOut(BaseSchema):

@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from app.models.location import Location
     from app.models.feature import Feature
     from app.models.booking import Booking
+    from app.models.image import Image
 
 
 class Room(BaseSQLModel, table=True):
@@ -53,9 +54,6 @@ class Room(BaseSQLModel, table=True):
         default=None,
         sa_type=SAEnum(RoomType, name="pet1_roomtype"),
     )
-
-    image_id: int | None = Field(default=None, foreign_key="images.id", nullable=True)
-
     time_slot_type: TimeSlotType = Field(
         sa_type=SAEnum(TimeSlotType, name="pet1_timeslottype"), default=TimeSlotType.FLEXIBLE
     )
@@ -72,3 +70,4 @@ class Room(BaseSQLModel, table=True):
 
     features: list["Feature"] = Relationship(back_populates="room")
     bookings: list["Booking"] = Relationship(back_populates="room")
+    images: list["Image"] = Relationship(back_populates="room")
