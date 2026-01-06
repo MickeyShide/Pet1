@@ -1,6 +1,7 @@
 from app.models.base import BaseSQLModel
 from .booking import Booking
 from .feature import Feature
+from .file import File
 from .image import Image
 from .location import Location
 from .notificationlog import NotificationLog
@@ -20,4 +21,5 @@ __all__ = [
     "NotificationLog",
     "Image",
     "Feature",
+    "File"
 ]

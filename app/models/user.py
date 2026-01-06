@@ -1,8 +1,9 @@
 from enum import Enum
+from typing import List, TYPE_CHECKING
 
 from pydantic import EmailStr
 from sqlalchemy import Enum as SAEnum
-from sqlmodel import Field
+from sqlmodel import Field, Relationship
 
 from .base import BaseSQLModel
 
@@ -11,6 +12,8 @@ class UserRole(str, Enum):
     USER = "USER"
     ADMIN = "ADMIN"
 
+if TYPE_CHECKING:
+    from app.models.file import File
 
 class User(BaseSQLModel, table=True):
     __tablename__ = "users"
@@ -27,3 +30,5 @@ class User(BaseSQLModel, table=True):
         default=UserRole.USER,
         nullable=False,
     )
+
+    files: List["File"] = Relationship(back_populates="user")
