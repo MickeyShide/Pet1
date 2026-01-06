@@ -20,6 +20,10 @@ def test__sanitize_filename_replaces_dotdot():
     assert sanitize_filename("a..b") == "a_b"
 
 
+def test__sanitize_filename_cleans_multiple_dotdot_and_slashes():
+    assert sanitize_filename("..//a\\..\\b") == "___a___b"
+
+
 def test__sanitize_filename_rejects_null_byte():
     with pytest.raises(HTTPException) as exc:
         sanitize_filename("bad\x00name.png")
@@ -45,6 +49,12 @@ def test__validate_content_type_rejects_unknown():
     assert exc.value.status_code == 415
 
 
+def test__validate_content_type_rejects_empty_whitelist():
+    with pytest.raises(HTTPException) as exc:
+        validate_content_type("image/png", set())
+    assert exc.value.status_code == 415
+
+
 def test__validate_size_allows_none():
     validate_size("PRESIGNED", None, 10, 20)
 
@@ -65,6 +75,11 @@ def test__validate_size_rejects_presigned_limit():
     with pytest.raises(HTTPException) as exc:
         validate_size("PRESIGNED", 21, 10, 20)
     assert exc.value.status_code == 413
+
+
+def test__validate_size_allows_equal_limits():
+    validate_size("PROXY", 10, 10, 20)
+    validate_size("PRESIGNED", 20, 10, 20)
 
 
 def test__build_object_key_format():

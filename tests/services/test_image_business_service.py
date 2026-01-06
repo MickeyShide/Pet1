@@ -58,6 +58,7 @@ async def test__upload_room_image_creates_file_and_image(db_session, faker, monk
     assert stored_file.public_url == result.public_url
     assert stored_file.status == FileStatus.PENDING
     assert stored_file.is_public is True
+    assert stored_file.public_url == result.public_url
 
 
 @pytest.mark.asyncio
@@ -74,6 +75,37 @@ async def test__upload_room_image_rejects_invalid_content_type(db_session, faker
     with pytest.raises(HTTPException) as exc:
         await ImageBusinessService(token_data=token).upload_room_image(room.id, payload)
     assert exc.value.status_code == 415
+
+
+@pytest.mark.asyncio
+async def test__upload_room_image_presign_uses_public_bucket(db_session, faker, monkeypatch):
+    user = await create_user(db_session, faker)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    await db_session.commit()
+    token = SAccessToken(sub=str(user.id), admin=True)
+
+    monkeypatch.setattr(settings, "S3_PUBLIC_BASE_URL", "http://cdn.local/")
+    monkeypatch.setattr(settings, "S3_PUBLIC_BUCKET", "public-uploads")
+    monkeypatch.setattr(settings, "FILES_ALLOWED_CONTENT_TYPES", "image/png")
+
+    captured = {}
+
+    async def fake_presign_upload_put(self, bucket, key, content_type, expires):
+        captured["bucket"] = bucket
+        captured["key"] = key
+        captured["content_type"] = content_type
+        captured["expires"] = expires
+        return f"http://s3.local/upload/{key}"
+
+    monkeypatch.setattr(FileService, "presign_upload_put", fake_presign_upload_put)
+
+    payload = SImageUploadIn(mime="image/png", ext="png", size=321, original_name="room.png")
+    await ImageBusinessService(token_data=token).upload_room_image(room.id, payload)
+
+    assert captured["bucket"] == "public-uploads"
+    assert captured["key"].startswith(f"images/rooms/{room.id}/")
+    assert captured["content_type"] == "image/png"
 
 
 @pytest.mark.asyncio
@@ -138,6 +170,8 @@ async def test__upload_location_image_creates_file_and_image(db_session, faker, 
     assert stored_image is not None
     assert stored_image.type == ImageType.LOCATION
     assert stored_image.location_id == location.id
+    stored_file = await db_session.get(File, stored_image.file_id)
+    assert stored_file.object_key == f"images/locations/{location.id}/abc123.jpg"
 
 
 @pytest.mark.asyncio
@@ -191,6 +225,22 @@ async def test__upload_room_image_sanitizes_original_name(db_session, faker, mon
 
 
 @pytest.mark.asyncio
+async def test__upload_room_image_rejects_null_byte_name(db_session, faker, monkeypatch):
+    user = await create_user(db_session, faker)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    await db_session.commit()
+    token = SAccessToken(sub=str(user.id), admin=True)
+
+    monkeypatch.setattr(settings, "FILES_ALLOWED_CONTENT_TYPES", "image/png")
+
+    payload = SImageUploadIn(mime="image/png", ext="png", size=111, original_name="bad\x00name.png")
+    with pytest.raises(HTTPException) as exc:
+        await ImageBusinessService(token_data=token).upload_room_image(room.id, payload)
+    assert exc.value.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test__upload_location_image_not_found(db_session, faker):
     user = await create_user(db_session, faker)
     await db_session.commit()
@@ -210,6 +260,16 @@ async def test__upload_room_image_requires_user(db_session, faker):
     payload = SImageUploadIn(mime="image/png", ext="png", size=111, original_name="room.png")
     with pytest.raises(UnauthorizedException):
         await ImageBusinessService(token_data=None).upload_room_image(room.id, payload)
+
+
+@pytest.mark.asyncio
+async def test__upload_location_image_requires_user(db_session, faker):
+    location = await create_location(db_session, faker)
+    await db_session.commit()
+
+    payload = SImageUploadIn(mime="image/png", ext="png", size=111, original_name="loc.png")
+    with pytest.raises(UnauthorizedException):
+        await ImageBusinessService(token_data=None).upload_location_image(location.id, payload)
 
 
 @pytest.mark.asyncio
@@ -261,6 +321,52 @@ async def test__delete_image_removes_file_and_image(db_session, faker, monkeypat
     db_session.expire_all()
     assert await db_session.get(Image, image_id) is None
     assert await db_session.get(File, file_id) is None
+
+
+@pytest.mark.asyncio
+async def test__delete_image_handles_non_public_file(db_session, faker, monkeypatch):
+    user = await create_user(db_session, faker)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    token = SAccessToken(sub=str(user.id), admin=True)
+
+    file = File(
+        user_id=user.id,
+        bucket="private-uploads",
+        object_key="images/rooms/1/private.png",
+        original_name="room.png",
+        content_type="image/png",
+        size_bytes=123,
+        checksum_sha256=None,
+        status=FileStatus.PENDING,
+        is_public=False,
+        public_url=None,
+        meta={},
+    )
+    db_session.add(file)
+    await db_session.flush()
+
+    image = Image(
+        type=ImageType.ROOM,
+        image1x="http://cdn.local/private.png",
+        image2x=None,
+        file_id=file.id,
+        room_id=room.id,
+        location_id=None,
+    )
+    db_session.add(image)
+    await db_session.commit()
+
+    calls: list[tuple[str, str]] = []
+
+    async def fake_delete_object(self, bucket, key):
+        calls.append((bucket, key))
+
+    monkeypatch.setattr(FileService, "delete_object", fake_delete_object)
+
+    await ImageBusinessService(token_data=token).delete_image(image.id)
+
+    assert calls == [("private-uploads", "images/rooms/1/private.png")]
 
 
 @pytest.mark.asyncio

@@ -136,6 +136,36 @@ async def test__upload_room_image_not_found(async_client, db_session, faker):
 
 
 @pytest.mark.asyncio
+async def test__upload_room_image_invalid_payload_missing_fields(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    override_admin_token(async_client.app_ref, user_id=user.id)
+
+    response = await async_client.post(
+        "/rooms/1/upload_image",
+        json={"mime": "image/png"},
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test__upload_room_image_invalid_payload_types(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    override_admin_token(async_client.app_ref, user_id=user.id)
+
+    response = await async_client.post(
+        "/rooms/1/upload_image",
+        json={"mime": "image/png", "ext": "png", "size": "bad"},
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test__upload_room_image_invalid_content_type(async_client, db_session, faker, monkeypatch):
     user = await create_user(db_session, faker)
     location = await create_location(db_session, faker)
@@ -197,6 +227,26 @@ async def test__upload_room_image_invalid_size_zero(async_client, db_session, fa
 
 
 @pytest.mark.asyncio
+async def test__upload_room_image_negative_size(async_client, db_session, faker, monkeypatch):
+    user = await create_user(db_session, faker)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    await db_session.commit()
+    override_admin_token(async_client.app_ref, user_id=user.id)
+
+    monkeypatch.setattr(settings, "FILES_ALLOWED_CONTENT_TYPES", "image/png")
+
+    response = await async_client.post(
+        f"/rooms/{room.id}/upload_image",
+        json={"mime": "image/png", "ext": "png", "size": -1},
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test__upload_room_image_sanitizes_original_name(async_client, db_session, faker, monkeypatch):
     user = await create_user(db_session, faker)
     location = await create_location(db_session, faker)
@@ -230,6 +280,31 @@ async def test__upload_room_image_sanitizes_original_name(async_client, db_sessi
     stored_image = await db_session.get(Image, response.json()["id"])
     stored_file = await db_session.get(File, stored_image.file_id)
     assert stored_file.original_name == sanitize_filename(original_name)
+
+
+@pytest.mark.asyncio
+async def test__upload_room_image_rejects_null_byte_name(async_client, db_session, faker, monkeypatch):
+    user = await create_user(db_session, faker)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    await db_session.commit()
+    override_admin_token(async_client.app_ref, user_id=user.id)
+
+    monkeypatch.setattr(settings, "FILES_ALLOWED_CONTENT_TYPES", "image/png")
+
+    response = await async_client.post(
+        f"/rooms/{room.id}/upload_image",
+        json={
+            "mime": "image/png",
+            "ext": "png",
+            "size": 123,
+            "original_name": "bad\x00name.png",
+        },
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -321,6 +396,55 @@ async def test__upload_location_image_invalid_content_type(async_client, db_sess
 
     async_client.app_ref.dependency_overrides.clear()
     assert response.status_code == 415
+
+
+@pytest.mark.asyncio
+async def test__upload_location_image_invalid_payload_missing_fields(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    override_admin_token(async_client.app_ref, user_id=user.id)
+
+    response = await async_client.post(
+        "/locations/1/upload_image",
+        json={"mime": "image/png"},
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test__upload_location_image_invalid_payload_types(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    override_admin_token(async_client.app_ref, user_id=user.id)
+
+    response = await async_client.post(
+        "/locations/1/upload_image",
+        json={"mime": "image/png", "ext": "png", "size": "bad"},
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test__upload_location_image_negative_size(async_client, db_session, faker, monkeypatch):
+    user = await create_user(db_session, faker)
+    location = await create_location(db_session, faker)
+    await db_session.commit()
+    override_admin_token(async_client.app_ref, user_id=user.id)
+
+    monkeypatch.setattr(settings, "FILES_ALLOWED_CONTENT_TYPES", "image/png")
+
+    response = await async_client.post(
+        f"/locations/{location.id}/upload_image",
+        json={"mime": "image/png", "ext": "png", "size": -1},
+        headers=auth_header(),
+    )
+
+    async_client.app_ref.dependency_overrides.clear()
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio
