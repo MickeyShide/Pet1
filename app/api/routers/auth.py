@@ -28,6 +28,13 @@ async def register_route(user_data: SRegister) -> SUserOut:
 async def login_route(request: Request, response: Response, login_data: SLogin) -> SLoginOut:
     return await AuthBusinessService().login(request, response, login_data)
 
+@router.post(
+    path='/logout',
+    status_code=status.HTTP_200_OK,
+    description="Logout a user", )
+async def logout_route(response: Response):
+    return await AuthBusinessService().logout(response)
+
 
 @router.post(
     path='/refresh',

@@ -52,10 +52,17 @@ class AuthBusinessService(BaseBusinessService):
             secure=settings.COOKIE_SECURE,
             samesite="none",
             max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-            #path="/auth/refresh",
+            # path="/auth/refresh",
         )
 
         return access_token, refresh_token
+
+    @staticmethod
+    def _delete_cookies(response: Response):
+        """
+        Just delete cookies :3
+        """
+        response.delete_cookie(key="refresh_token")
 
     @new_session()
     async def register(self, user_data: SRegister) -> SUserOut:
@@ -86,6 +93,10 @@ class AuthBusinessService(BaseBusinessService):
             access_token=access_token,
             user=SUserOut.from_model(user),
         )
+
+    @new_session()
+    async def logout(self, response: Response):
+        self._delete_cookies(response=response)
 
     @new_session()
     async def refresh(self, request: Request, response: Response) -> SLoginOut:
