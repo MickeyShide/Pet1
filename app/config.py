@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     DEBUG: bool = False
+    APP_ENV: str = "local"
 
     # Database
     DATABASE_URL: str  # postgresql+asyncpg://user:pass@host:port/db
@@ -41,7 +42,12 @@ class Settings(BaseSettings):
     S3_ACCESS_KEY: str = "minioadmin"
     S3_SECRET_KEY: str = "minioadmin"
     S3_BUCKET: str = "uploads"
+    S3_PUBLIC_BUCKET: str | None = None
     S3_REGION: str = "us-east-1"
+    S3_PRESIGN_EXPIRES_SECONDS: int = 900
+    S3_MAX_UPLOAD_BYTES_PROXY: int = 50 * 1024 * 1024
+    S3_MAX_UPLOAD_BYTES_PRESIGNED: int = 2 * 1024 * 1024 * 1024
+    FILES_ALLOWED_CONTENT_TYPES: str = "image/jpeg,image/png,application/pdf"
 
     # Domain settings
     BOOKING_EXPIRE_SECONDS: int = 20
@@ -56,6 +62,17 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @property
+    def files_allowed_content_types(self) -> set[str]:
+        raw = self.FILES_ALLOWED_CONTENT_TYPES
+        if not raw:
+            return set()
+        return {item.strip() for item in raw.split(",") if item.strip()}
+
+    @property
+    def s3_public_bucket(self) -> str:
+        return self.S3_PUBLIC_BUCKET or self.S3_BUCKET
 
 
 settings = Settings()
