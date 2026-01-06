@@ -62,7 +62,13 @@ class AuthBusinessService(BaseBusinessService):
         """
         Just delete cookies :3
         """
-        response.delete_cookie(key="refresh_token")
+        response.delete_cookie(
+            key="refresh_token",
+            httponly=True,
+            secure=settings.COOKIE_SECURE,
+            samesite="none",
+            # path="/auth/refresh",
+        )
 
     @new_session()
     async def register(self, user_data: SRegister) -> SUserOut:
