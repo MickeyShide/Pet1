@@ -16,6 +16,14 @@ def test__sanitize_filename_replaces_paths_and_trims():
     assert sanitize_filename("  foo/bar\\baz  ") == "foo_bar_baz"
 
 
+def test__sanitize_filename_keeps_extension():
+    assert sanitize_filename("photo.jpeg") == "photo.jpeg"
+
+
+def test__sanitize_filename_handles_only_separators():
+    assert sanitize_filename("////") == "____"
+
+
 def test__sanitize_filename_replaces_dotdot():
     assert sanitize_filename("a..b") == "a_b"
 
@@ -28,6 +36,10 @@ def test__sanitize_filename_rejects_null_byte():
     with pytest.raises(HTTPException) as exc:
         sanitize_filename("bad\x00name.png")
     assert exc.value.status_code == 422
+
+
+def test__sanitize_filename_strips_leading_trailing_spaces():
+    assert sanitize_filename("   name.png   ") == "name.png"
 
 
 def test__sanitize_filename_empty_defaults():
@@ -53,6 +65,16 @@ def test__validate_content_type_rejects_empty_whitelist():
     with pytest.raises(HTTPException) as exc:
         validate_content_type("image/png", set())
     assert exc.value.status_code == 415
+
+
+def test__validate_content_type_rejects_case_mismatch():
+    with pytest.raises(HTTPException) as exc:
+        validate_content_type("Image/PNG", {"image/png"})
+    assert exc.value.status_code == 415
+
+
+def test__validate_content_type_allows_multiple_types():
+    validate_content_type("image/png", {"image/png", "image/jpeg"})
 
 
 def test__validate_size_allows_none():
@@ -82,6 +104,18 @@ def test__validate_size_allows_equal_limits():
     validate_size("PRESIGNED", 20, 10, 20)
 
 
+def test__build_public_url_preserves_path():
+    assert build_public_url("https://cdn.local", "bucket", "a/b/c.png") == (
+        "https://cdn.local/bucket/a/b/c.png"
+    )
+
+
+def test__build_public_url_strips_trailing_slash():
+    assert build_public_url("https://cdn.local/", "bucket", "x.png") == (
+        "https://cdn.local/bucket/x.png"
+    )
+
+
 def test__build_object_key_format():
     dt = datetime(2025, 1, 2)
     key = build_object_key("dev", 7, dt, 123, "name.png")
@@ -91,4 +125,10 @@ def test__build_object_key_format():
 def test__build_public_url_normalizes_base():
     assert build_public_url("http://cdn.local/", "bucket", "path/file.png") == (
         "http://cdn.local/bucket/path/file.png"
+    )
+
+
+def test__build_public_url_supports_base_path():
+    assert build_public_url("https://cdn.local/static", "bucket", "file.png") == (
+        "https://cdn.local/static/bucket/file.png"
     )
