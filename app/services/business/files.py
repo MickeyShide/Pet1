@@ -16,7 +16,6 @@ from app.schemas.file import (
 from app.services.business.base import BaseBusinessService
 from app.services.file import FileService
 from app.utils.err.base.conflict import ConflictException
-from app.utils.err.base.unauthorized import UnauthorizedException
 from app.utils.file_utils import (
     sanitize_filename,
     validate_content_type,
@@ -28,11 +27,6 @@ from app.utils.file_utils import (
 
 class FileBusinessService(BaseBusinessService):
     file_service: FileService
-
-    async def _require_user(self) -> int:
-        if self.user_id is None:
-            raise UnauthorizedException("Missing user")
-        return self.user_id
 
     @new_session()
     async def init_upload(self, payload: SFileInitUploadIn) -> SFileInitUploadOut:
@@ -134,8 +128,7 @@ class FileBusinessService(BaseBusinessService):
 
     @new_session(readonly=True)
     async def get(self, file_id: int) -> SFileOut:
-        user_id = await self._require_user()
-        file = await self.file_service.get_first_by_filters(id=file_id, user_id=user_id)
+        file = await self.file_service.get_first_by_filters(id=file_id, user_id=self.user_id)
         payload = SFileOut.model_validate(file)
         if file.is_public:
             return payload.model_copy(
