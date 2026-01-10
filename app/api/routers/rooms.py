@@ -1,12 +1,12 @@
 from typing import List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query, Body
 from starlette import status
 
 from app.api import docs
 from app.api.deps import AdminDepends, TimeSlotDateRangeDepends
 from app.schemas.image import SImageUploadIn, SImagePresignOut
-from app.schemas.room import SRoomOut, SRoomUpdate, SRoomOutWithLocation
+from app.schemas.room import SRoomOut, SRoomUpdate, SRoomOutWithLocation, SRoomFilter
 from app.schemas.timeslot import STimeSlotOut, STimeSlotOutWithBookingStatus, STimeSlotCreate, \
     SPriceQuoteOut, SPriceQuoteIn
 from app.services.business.images import ImageBusinessService
