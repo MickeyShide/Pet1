@@ -22,6 +22,21 @@ router = APIRouter(prefix="/rooms", tags=["Rooms"])
     description="Return all rooms", )
 async def get_all_rooms_route() -> list[SRoomOutWithLocation]:
     return await RoomBusinessService().get_all_with_location()
+    description="Return all rooms",
+    responses={
+        status.HTTP_200_OK: docs.response_with_example(
+            "Rooms",
+            [docs.ROOM_WITH_LOCATION_EXAMPLE],
+            model=list[SRoomOutWithLocation],
+        ),
+    },
+)
+async def get_all_rooms_route(
+        page: int = Query(default=0),
+        limit: int = Query(default=5),
+        filters: SRoomFilter = Body()
+) -> list[SRoomOutWithLocation]:
+    return await RoomBusinessService().get_all_with_location(filters, page, limit)
 
 
 @router.get(

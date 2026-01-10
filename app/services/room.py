@@ -13,6 +13,13 @@ class RoomService(BaseService[Room]):
 
     async def get_all_with_location(self) -> list[Room]:
         return await self._repository.get_all_with_location()
+    async def get_all_with_location(
+            self,
+            filters: SRoomFilter,
+            page: int,
+            limit: int,
+    ) -> list[Room]:
+        return await self._repository.get_all_with_location(filters=filters, page=page, limit=limit)
 
     async def get_price_quote(
             self,

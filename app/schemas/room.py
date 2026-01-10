@@ -21,6 +21,18 @@ class SRoomBase(BaseSchema):
     hour_price: Decimal
     is_active: bool
 
+class SRoomFilter(BaseSchema):
+    location_id: int | None = None
+    name: str | None = None
+    capacity: int | None = None
+    description: str | None = None
+    type: RoomType | None = None
+    time_slot_type: TimeSlotType | None = None
+    min_booking_duration_minutes: int | None = None
+    booking_step_minutes: int | None = None
+    hour_price: Decimal | None = None
+    is_active: bool | None = None
+
 
 class SRoomOut(SRoomBase):
     id: int

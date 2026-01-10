@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 from app.models.location import Location
 from app.models.room import Room
 from app.repositories.base import BaseRepository
+from app.schemas.room import SRoomFilter
 
 
 class RoomRepository(BaseRepository[Room]):
@@ -49,10 +50,9 @@ class RoomRepository(BaseRepository[Room]):
 
     async def get_all_with_location(
             self,
-            desc: bool = True,
-            offset: int | None = None,
+            filters: SRoomFilter,
+            page: int | None = None,
             limit: int | None = None,
-            **filters: Any,
     ) -> List[Room]:
 
         query = (
@@ -63,16 +63,11 @@ class RoomRepository(BaseRepository[Room]):
                 selectinload(self._model_cls.location).selectinload(Location.images),
                 selectinload(self._model_cls.location).selectinload(Location.features),
             )
-            .filter_by(**filters)
+            .filter_by(**filters.to_dict())
         )
 
-        if desc:
-            query = query.order_by(self._model_cls.id.desc())
-        else:
-            query = query.order_by(self._model_cls.id)
-
-        if offset is not None:
-            query = query.offset(offset)
+        if page is not None:
+            query = query.offset(page*limit)
         if limit is not None:
             query = query.limit(limit)
 
