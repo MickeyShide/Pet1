@@ -3,7 +3,8 @@ from typing import List
 from fastapi import APIRouter
 from starlette import status
 
-from app.api.deps import AdminDepends, UserDepends, TimeSlotDateRangeDepends
+from app.api import docs
+from app.api.deps import AdminDepends, TimeSlotDateRangeDepends
 from app.schemas.image import SImageUploadIn, SImagePresignOut
 from app.schemas.room import SRoomOut, SRoomUpdate, SRoomOutWithLocation
 from app.schemas.timeslot import STimeSlotOut, STimeSlotOutWithBookingStatus, STimeSlotCreate, \
