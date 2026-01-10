@@ -5,6 +5,7 @@ from pydantic import model_validator
 from app.models.room import RoomType, TimeSlotType
 from app.schemas import BaseSchema
 from app.schemas.feature import SFeatureOut
+from app.schemas.image import SImageOut
 from app.schemas.location import SLocationOut
 
 
@@ -28,6 +29,7 @@ class SRoomOut(SRoomBase):
 
 class SRoomOutWithLocation(SRoomOut):
     location: SLocationOut
+    images: list[SImageOut]
 
 
 class SRoomCreate(BaseSchema):
