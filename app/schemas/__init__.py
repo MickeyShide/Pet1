@@ -28,4 +28,4 @@ class BaseSchema(BaseModel):
         """
         without unset!
         """
-        return self.model_dump(exclude_unset=True)
+        return self.model_dump(exclude_unset=True, exclude_none=True)
