@@ -4,6 +4,8 @@ from decimal import Decimal, ROUND_HALF_UP
 from app.models import Room
 from app.models.room import TimeSlotType
 from app.repositories.room import RoomRepository
+from app.schemas.booking import SBookingCreateFlexible
+from app.schemas.room import SRoomFilter
 from app.services.base import BaseService
 from app.utils.err.room import NotFlexibleTimeslotsType, InvalidBookingDuration
 
