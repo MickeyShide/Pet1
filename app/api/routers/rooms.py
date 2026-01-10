@@ -19,9 +19,6 @@ router = APIRouter(prefix="/rooms", tags=["Rooms"])
     path='',
     response_model=list[SRoomOutWithLocation],
     status_code=status.HTTP_200_OK,
-    description="Return all rooms", )
-async def get_all_rooms_route() -> list[SRoomOutWithLocation]:
-    return await RoomBusinessService().get_all_with_location()
     description="Return all rooms",
     responses={
         status.HTTP_200_OK: docs.response_with_example(

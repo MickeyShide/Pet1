@@ -11,8 +11,6 @@ from app.utils.err.room import NotFlexibleTimeslotsType, InvalidBookingDuration
 class RoomService(BaseService[Room]):
     _repository = RoomRepository
 
-    async def get_all_with_location(self) -> list[Room]:
-        return await self._repository.get_all_with_location()
     async def get_all_with_location(
             self,
             filters: SRoomFilter,
@@ -20,6 +18,24 @@ class RoomService(BaseService[Room]):
             limit: int,
     ) -> list[Room]:
         return await self._repository.get_all_with_location(filters=filters, page=page, limit=limit)
+
+    @staticmethod
+    def _coerce_booking_data(
+        booking_data: SBookingCreateFlexible | int,
+        date_from: datetime | None,
+        date_to: datetime | None,
+    ) -> SBookingCreateFlexible:
+        if isinstance(booking_data, SBookingCreateFlexible):
+            return booking_data
+
+        if date_from is None or date_to is None:
+            raise ValueError("date_from and date_to are required when booking_data is a room_id")
+
+        return SBookingCreateFlexible(
+            room_id=booking_data,
+            start_datetime=date_from,
+            end_datetime=date_to,
+        )
 
     async def get_price_quote(
             self,
