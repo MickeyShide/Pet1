@@ -59,7 +59,8 @@ class RoomRepository(BaseRepository[Room]):
             select(self._model_cls)
             .options(
                 selectinload(self._model_cls.features),
-                selectinload(self._model_cls.location).selectinload(Location.features),
+                selectinload(self._model_cls.location).selectinload(self._model_cls.images)
+                .selectinload(Location.features).selectinload(Location.images),
             )
             .filter_by(**filters)
         )
