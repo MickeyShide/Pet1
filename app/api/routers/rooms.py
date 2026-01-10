@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, Query, Body
+from fastapi import APIRouter, Query, Depends
 from starlette import status
 
 from app.api import docs
