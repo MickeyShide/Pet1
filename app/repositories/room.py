@@ -54,7 +54,7 @@ class RoomRepository(BaseRepository[Room]):
             page: int | None = None,
             limit: int | None = None,
     ) -> List[Room]:
-
+        print(filters.to_dict())
         query = (
             select(self._model_cls)
             .options(
