@@ -73,7 +73,7 @@ async def _expire_booking(booking_id: int) -> dict[str, Any]:
 
 
 @celery_app.task(name="app.bookings.expire_booking")
-def expire_booking(booking_id: int) -> dict[str, Any]:
+def expire_booking_task(booking_id: int) -> dict[str, Any]:
     """
     Celery entrypoint for expiring bookings according to the spec.
     """
