@@ -21,12 +21,14 @@ class FeatureBusinessService(BaseBusinessService):
     @new_session(readonly=True)
     async def get_by_id(self, feature_id: int) -> SFeatureOut:
         feature: Feature = await self.feature_service.get_one_by_id(feature_id)
+
         return SFeatureOut.from_model(feature)
 
     @new_session()
     async def create(self, feature_data: SFeatureCreate) -> SFeatureOut:
         feature: Feature = await self.feature_service.create(**feature_data.to_dict())
         await CacheService().delete_pattern(keys.locations_all())
+
         return SFeatureOut.from_model(feature)
 
     @new_session()
@@ -60,10 +62,13 @@ class FeatureBusinessService(BaseBusinessService):
             feature_id,
             **feature_data.to_dict(),
         )
-        await CacheService().delete_pattern(keys.locations_all())
+
+        await CacheService().invalidate_locations()
+
         return SFeatureOut.from_model(feature)
 
     @new_session()
     async def delete_by_id(self, feature_id: int) -> None:
         await self.feature_service.delete_by_id(feature_id)
-        await CacheService().delete_pattern(keys.locations_all())
+
+        await CacheService().invalidate_locations()

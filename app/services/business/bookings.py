@@ -4,11 +4,11 @@ from typing import List, Tuple
 
 from sqlalchemy.exc import IntegrityError
 
-from app.celery_app.tasks import expire_booking
+from app.celery_app.manager import CeleryManager
 from app.config import settings
 from app.db.base import new_session
 from app.models import Booking, TimeSlot
-from app.models.room import TimeSlotType
+from app.models.room import TimeSlotType, Room
 from app.models.timeslot import TimeSlotStatus
 from app.schemas.booking import (
     SBookingCreate,
@@ -35,7 +35,7 @@ class BookingsBusinessService(BaseBusinessService):
 
     @new_session()
     async def create_booking(self, booking_data: SBookingCreate) -> SBookingOutAfterCreate:
-        timeslot = await self.timeslot_service.lock_time_slot_for_booking(booking_data.timeslot_id)
+        timeslot: TimeSlot = await self.timeslot_service.lock_time_slot_for_booking(booking_data.timeslot_id)
 
         new_booking: Booking = await self.booking_service.create(
             user_id=self.user_id,
@@ -44,12 +44,11 @@ class BookingsBusinessService(BaseBusinessService):
             total_price=timeslot.base_price,
             expires_at=datetime.now(UTC) + timedelta(seconds=settings.BOOKING_EXPIRE_SECONDS),
         )
-        try:
-            expire_booking.apply_async(args=[new_booking.id], eta=new_booking.expires_at)
-        except Exception as exc:
-            ...
-            # TODO сюда логгер
-        await CacheService().delete_pattern(cache_keys.timeslots_room_prefix(timeslot.room_id))
+
+        await CeleryManager.expire_booking(booking=new_booking)
+
+        await CacheService().invalidate_timeslots_by_room_id(room_id=timeslot.room_id)
+
         return SBookingOutAfterCreate.from_model(new_booking)
 
     @new_session()
@@ -58,18 +57,10 @@ class BookingsBusinessService(BaseBusinessService):
         room = await self.room_service.get_one_by_id(booking_data.room_id)
 
         # checks: timeslot type IS flexible, timeslot datetimes is correct
-        await self.room_service.check_flexible_booking(
-            room=room,
-            start_datetime=booking_data.start_datetime,
-            end_datetime=booking_data.end_datetime
-        )
+        await self.room_service.check_flexible_booking(room=room,booking_data=booking_data)
 
         # get timeslot price
-        base_price: Decimal = await self.room_service.get_price_quote(
-            room_id=booking_data.room_id,
-            date_from=booking_data.start_datetime,
-            date_to=booking_data.end_datetime
-        )
+        base_price: Decimal = await self.room_service.get_price_quote(booking_data=booking_data)
 
         # try to create timeslot
         try:
@@ -81,9 +72,6 @@ class BookingsBusinessService(BaseBusinessService):
             )
         except IntegrityError:
             raise InvalidTimeSlot()
-
-        # invalidate timeslots cache
-        await CacheService().delete_pattern(cache_keys.timeslots_room_prefix(booking_data.room_id))
 
         # lock the timeslot for the booking
         timeslot: TimeSlot = await self.timeslot_service.lock_time_slot_for_booking(new_slot.id)
@@ -103,14 +91,10 @@ class BookingsBusinessService(BaseBusinessService):
             raise SlotAlreadyTaken()
 
         # task to expire booking and timeslot
-        try:
-            expire_booking.apply_async(args=[new_booking.id], eta=new_booking.expires_at)
-        except Exception as exc:
-            ...
-            # TODO сюда логгер
+        await CeleryManager.expire_booking(booking=new_booking)
 
         # invalidate timeslots cache
-        await CacheService().delete_pattern(cache_keys.timeslots_room_prefix(timeslot.room_id))
+        await CacheService().invalidate_timeslots_by_room_id(room_id=timeslot.room_id)
 
         return SBookingOutWithTimeslots(
             booking=SBookingOut.from_model(new_booking),
@@ -153,17 +137,18 @@ class BookingsBusinessService(BaseBusinessService):
     @new_session()
     async def cancel_booking(self, booking_id: int) -> bool:
         booking: Booking = await self.booking_service.get_one_by_id(booking_id)
-        result = await self.booking_service.cancel_booking(
+        result: bool = await self.booking_service.cancel_booking(
             booking_id=booking_id,
             user_id=self.user_id,
             is_admin=self.admin,
         )
         if result:
-            room = await self.room_service.get_one_by_id(booking.room_id)
+            room: Room = await self.room_service.get_one_by_id(booking.room_id)
             if room.time_slot_type == TimeSlotType.FLEXIBLE:
                 await self.timeslot_service.update_by_id(
                     booking.timeslot_id,
                     status=TimeSlotStatus.CANCELED,
                 )
-        await CacheService().delete_pattern(cache_keys.timeslots_room_prefix(booking.room_id))
+            # invalidate timeslots cache
+            await CacheService().invalidate_timeslots_by_room_id(room_id=room.id)
         return result

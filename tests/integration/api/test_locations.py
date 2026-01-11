@@ -1,0 +1,358 @@
+from decimal import Decimal
+
+import pytest
+from sqlalchemy import select
+
+from app.models.room import TimeSlotType
+from app.models import Location, Room
+from tests.factories import (
+    create_location,
+    create_room,
+    create_feature,
+)
+from tests.integration.api.helpers import clear_overrides, override_admin_token, override_user_token
+
+@pytest.mark.asyncio
+async def test__create_location_requires_admin(async_client, db_session, faker):
+    override_user_token(async_client.app_ref)
+    payload = {
+        "name": "HQ",
+        "address": "1 Main",
+        "description": "HQ office",
+    }
+
+    response = await async_client.post("/locations", json=payload, headers={"Authorization": "Bearer test"})
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 403, response.text
+
+
+@pytest.mark.asyncio
+async def test__create_location_with_admin(async_client, db_session, faker):
+    override_admin_token(async_client.app_ref)
+    payload = {
+        "name": "HQ",
+        "address": "1 Main",
+        "description": "HQ office",
+    }
+
+    response = await async_client.post("/locations", json=payload, headers={"Authorization": "Bearer test"})
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 200, response.text
+    stored = await db_session.execute(Location.__table__.select().where(Location.name == "HQ"))
+    assert stored.first() is not None
+
+
+@pytest.mark.asyncio
+async def test__create_location_invalid_payload_returns_422(async_client, db_session, faker):
+    override_admin_token(async_client.app_ref)
+    payload = {
+        "address": "1 Main",
+        "description": "HQ office",
+    }
+
+    response = await async_client.post(
+        "/locations",
+        json=payload,
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__create_room_under_location(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    override_admin_token(async_client.app_ref)
+    payload = {
+        "name": "Board",
+        "capacity": 8,
+        "description": "Board room",
+        "is_active": True,
+        "time_slot_type": TimeSlotType.FIXED.value,
+        "hour_price": "12.5",
+    }
+    await db_session.flush()
+
+    response = await async_client.post(
+        f"/locations/{location.id}/rooms",
+        json=payload,
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 200, response.text
+    stored = await db_session.execute(Room.__table__.select().where(Room.location_id == location.id))
+    assert stored.first() is not None
+
+
+@pytest.mark.asyncio
+async def test__create_room_under_location_requires_admin(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    await db_session.flush()
+    override_user_token(async_client.app_ref)
+    payload = {
+        "name": "Board",
+        "capacity": 8,
+        "description": "Board room",
+        "is_active": True,
+    }
+
+    response = await async_client.post(
+        f"/locations/{location.id}/rooms",
+        json=payload,
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test__get_all_locations_returns_all(async_client, db_session, faker):
+    loc_a = await create_location(db_session, faker)
+    loc_b = await create_location(db_session, faker)
+    await db_session.flush()
+
+    response = await async_client.get("/locations")
+
+    assert response.status_code == 200
+    names = {item["name"] for item in response.json()}
+    assert {loc_a.name, loc_b.name}.issubset(names)
+
+
+@pytest.mark.asyncio
+async def test__get_location_by_id_returns_location(async_client, db_session, faker):
+    loc = await create_location(db_session, faker)
+    await db_session.flush()
+
+    response = await async_client.get(f"/locations/{loc.id}")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == loc.id
+    assert data["name"] == loc.name
+
+
+@pytest.mark.asyncio
+async def test__get_location_by_id_includes_features(async_client, db_session, faker):
+    loc = await create_location(db_session, faker)
+    feature = await create_feature(db_session, faker, location=loc, name="Parking")
+    await db_session.flush()
+
+    response = await async_client.get(f"/locations/{loc.id}")
+
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["id"] == loc.id
+    assert data["features"]
+    feature_payload = data["features"][0]
+    assert feature_payload["id"] == feature.id
+    assert feature_payload["name"] == "Parking"
+    assert feature_payload["location_id"] == loc.id
+
+
+@pytest.mark.asyncio
+async def test__get_location_by_id_not_found(async_client):
+    response = await async_client.get("/locations/99999")
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test__get_rooms_by_location_returns_rooms(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room_a = await create_room(db_session, faker, location=location)
+    room_b = await create_room(db_session, faker, location=location)
+    await db_session.flush()
+
+    response = await async_client.get(f"/locations/{location.id}/rooms")
+
+    assert response.status_code == 200
+    ids = {room["id"] for room in response.json()}
+    assert ids == {room_a.id, room_b.id}
+
+
+@pytest.mark.asyncio
+async def test__get_rooms_by_location_missing_location_returns_404(async_client):
+    response = await async_client.get("/locations/9999/rooms")
+
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test__get_rooms_by_location_returns_empty_for_missing_rooms(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    await db_session.flush()
+
+    response = await async_client.get(f"/locations/{location.id}/rooms")
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test__create_room_under_location_invalid_payload_returns_422(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    await db_session.flush()
+    override_admin_token(async_client.app_ref)
+    payload = {
+        "name": "Board",
+        "capacity": 8,
+        "description": "Board room",
+        "is_active": True,
+    }
+
+    response = await async_client.post(
+        f"/locations/{location.id}/rooms",
+        json=payload,
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__update_location_requires_admin__returns_forbidden(async_client, db_session, faker):
+    # Given
+    location = await create_location(db_session, faker)
+    await db_session.flush()
+    override_user_token(async_client.app_ref)
+
+    # When
+    response = await async_client.patch(
+        f"/locations/{location.id}",
+        json={"name": "Updated"},
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    # Then
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test__update_location_empty_payload_returns_422(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    await db_session.flush()
+    override_admin_token(async_client.app_ref)
+
+    response = await async_client.patch(
+        f"/locations/{location.id}",
+        json={},
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__update_location_with_admin__updates_record(async_client, db_session, faker):
+    # Given
+    location = await create_location(db_session, faker)
+    await db_session.flush()
+    override_admin_token(async_client.app_ref)
+
+    # When
+    response = await async_client.patch(
+        f"/locations/{location.id}",
+        json={"name": "Renamed HQ"},
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    # Then
+    assert response.status_code == 200, response.text
+    await db_session.refresh(location)
+    assert location.name == "Renamed HQ"
+
+
+@pytest.mark.asyncio
+async def test__delete_location_requires_admin__returns_forbidden(async_client, db_session, faker):
+    # Given
+    location = await create_location(db_session, faker)
+    await db_session.flush()
+    override_user_token(async_client.app_ref)
+
+    # When
+    response = await async_client.delete(
+        f"/locations/{location.id}",
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    # Then
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test__delete_location_with_admin__removes_record(async_client, db_session, faker):
+    # Given
+    location = await create_location(db_session, faker)
+    await db_session.flush()
+    override_admin_token(async_client.app_ref)
+
+    # When
+    response = await async_client.delete(
+        f"/locations/{location.id}",
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    # Then
+    assert response.status_code == 204
+    stmt = select(Location.id).where(Location.id == location.id)
+    result = await db_session.execute(stmt)
+    assert result.scalar_one_or_none() is None
+
+
+@pytest.mark.asyncio
+async def test__update_location_with_admin__not_found(async_client):
+    override_admin_token(async_client.app_ref)
+
+    response = await async_client.patch(
+        "/locations/9999",
+        json={"name": "Missing"},
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test__delete_location_with_admin__not_found(async_client):
+    override_admin_token(async_client.app_ref)
+
+    response = await async_client.delete(
+        "/locations/9999",
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test__create_room_under_missing_location_returns_404(async_client):
+    override_admin_token(async_client.app_ref)
+    payload = {
+        "name": "Board",
+        "capacity": 8,
+        "description": "Board room",
+        "is_active": True,
+        "time_slot_type": TimeSlotType.FIXED.value,
+        "hour_price": "12.5",
+    }
+
+    response = await async_client.post(
+        "/locations/9999/rooms",
+        json=payload,
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 404

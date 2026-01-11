@@ -20,14 +20,18 @@ class TimeSlotBusinessService(BaseBusinessService):
         updated = await self.timeslots_service.update_by_id(
             timeslot_id, **timeslot_data.to_dict()
         )
-        await CacheService().delete_pattern(cache_keys.timeslots_room_prefix(updated.room_id))
+
+        await CacheService().invalidate_timeslots_by_room_id(updated.room_id)
+
         return updated
 
     @new_session()
     async def delete_timeslot_by_id(self, timeslot_id: int):
         timeslot = await self.timeslots_service.get_one_by_id(timeslot_id)
+
         await self.timeslots_service.delete_by_id(timeslot_id)
-        await CacheService().delete_pattern(cache_keys.timeslots_room_prefix(timeslot.room_id))
+
+        await CacheService().invalidate_timeslots_by_room_id(timeslot.room_id)
 
     @new_session(readonly=True)
     async def get_by_room_and_date_range(
@@ -41,6 +45,7 @@ class TimeSlotBusinessService(BaseBusinessService):
             date_from=date_from,
             date_to=date_to,
         )
+
         result: list[STimeSlotRangeOut] = []
         for slot, _has_active_booking in timeslots_with_booking:
             label = f"{slot.start_datetime:%H:%M} - {slot.end_datetime:%H:%M}"
@@ -54,4 +59,5 @@ class TimeSlotBusinessService(BaseBusinessService):
                     hours=hours,
                 )
             )
+
         return result

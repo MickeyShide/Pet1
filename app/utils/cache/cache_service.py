@@ -1,10 +1,14 @@
 import json
+from datetime import datetime
 from typing import Generic, TypeVar, Type
 
 from redis.asyncio import Redis
 
 from app.config import settings
 from app.schemas import BaseSchema
+from app.schemas.location import SLocationOut
+from app.schemas.timeslot import STimeSlotOutWithBookingStatus, STimeSlotDateRange
+from app.utils.cache import keys
 from app.utils.redis import get_redis
 
 T = TypeVar("T")
@@ -223,3 +227,41 @@ class CacheService(Generic[T]):
         Safe delete (ignore Redis errors)
         """
         await self.delete(key)
+
+    async def invalidate_timeslots_by_room_id(self, room_id: int) -> None:
+        await self.delete_pattern(keys.timeslots_room_prefix(room_id))
+
+    async def invalidate_locations(self):
+        await self.delete_pattern(keys.locations_all())
+
+    async def get_cached_locations(self) -> list[SLocationOut]:
+        self.model = SLocationOut
+        self._collection_mode = True
+
+        return await self.try_get(keys.locations_all())
+
+    async def set_cached_locations(self, locations: list[SLocationOut]) -> None:
+        await self.try_set(keys.locations_all(), locations, ttl=settings.LOCATION_CACHE_TTL_SECONDS)
+
+    async def get_cached_timeslots(self, room_id: int, date_range: STimeSlotDateRange) -> list[STimeSlotOutWithBookingStatus]:
+
+        self.model = STimeSlotOutWithBookingStatus
+        self._collection_mode = True
+
+        cache_key = keys.timeslots_by_room_and_range(
+            room_id=room_id, date_from=date_range.date_from, date_to=date_range.date_to
+        )
+
+        return await self.try_get(cache_key)
+
+    async def set_cached_timeslots(self, room_id: int, date_range: STimeSlotDateRange, timeslots: list[STimeSlotOutWithBookingStatus]) -> None:
+
+        cache_key = keys.timeslots_by_room_and_range(
+            room_id=room_id, date_from=date_range.date_from, date_to=date_range.date_to
+        )
+
+        await self.try_set(
+            cache_key,
+            timeslots,
+            ttl=settings.TIMESLOT_CACHE_TTL_SECONDS,
+        )

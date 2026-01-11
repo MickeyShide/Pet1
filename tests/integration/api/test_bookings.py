@@ -1,0 +1,812 @@
+from datetime import datetime, timedelta, timezone
+
+import pytest
+
+from app.models import Booking, Payment
+from app.models.booking import BookingStatus
+from app.models.timeslot import TimeSlotStatus
+from app.schemas.auth import SAccessToken
+from tests.factories import (
+    create_booking,
+    create_location,
+    create_room,
+    create_timeslot,
+    create_user,
+)
+from tests.integration.api.helpers import clear_overrides, override_token_dependency
+
+@pytest.mark.asyncio
+async def test__create_booking_route__creates_booking(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    await db_session.flush()
+
+    response = await async_client.post("/bookings", json={"timeslot_id": slot.id})
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 201, response.text
+    booking = await db_session.get(Booking, response.json()["id"])
+    assert booking is not None
+    assert booking.user_id == user.id
+
+
+@pytest.mark.asyncio
+async def test__get_all_user_bookings__applies_status_filter(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot_paid = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    slot_canceled = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc) + timedelta(days=1),
+        end_datetime=datetime.now(timezone.utc) + timedelta(days=1, hours=1),
+    )
+    await create_booking(
+        db_session,
+        user=user,
+        room=room,
+        timeslot=slot_paid,
+        status=BookingStatus.PAID,
+    )
+    await create_booking(
+        db_session,
+        user=user,
+        room=room,
+        timeslot=slot_canceled,
+        status=BookingStatus.CANCELED,
+    )
+    await db_session.flush()
+
+    response = await async_client.get("/bookings?status=PAID")
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["booking"]["status"] == BookingStatus.PAID
+
+
+@pytest.mark.asyncio
+async def test__create_booking_route__requires_auth(async_client):
+    response = await async_client.post("/bookings", json={"timeslot_id": 1})
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test__create_booking_route__missing_timeslot_id_returns_422(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+
+    response = await async_client.post("/bookings", json={})
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test__create_booking_route__invalid_timeslot_id_returns_422(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+
+    response = await async_client.post("/bookings", json={"timeslot_id": "abc"})
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test__create_booking_route__extra_field_returns_422(async_client):
+    token = SAccessToken(sub="1", admin=False)
+    override_token_dependency(async_client.app_ref, token)
+
+    response = await async_client.post("/bookings", json={"timeslot_id": 1, "extra": "x"})
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__create_booking_route__timeslot_not_found_returns_404(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    await db_session.flush()
+
+    response = await async_client.post("/bookings", json={"timeslot_id": 9999})
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test__get_user_bookings_requires_auth(async_client):
+    response = await async_client.get("/bookings")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test__create_booking_route__fails_when_slot_taken(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    await create_booking(
+        db_session,
+        user=user,
+        room=room,
+        timeslot=slot,
+        status=BookingStatus.PAID,
+    )
+    await db_session.flush()
+
+    response = await async_client.post("/bookings", json={"timeslot_id": slot.id})
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test__create_booking_route__fails_when_slot_pending(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    await create_booking(
+        db_session,
+        user=user,
+        room=room,
+        timeslot=slot,
+        status=BookingStatus.PENDING_PAYMENTS,
+    )
+    await db_session.flush()
+
+    response = await async_client.post("/bookings", json={"timeslot_id": slot.id})
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test__create_booking_route__blocked_timeslot_returns_409(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+        status=TimeSlotStatus.BLOCKED,
+    )
+    await db_session.flush()
+
+    response = await async_client.post("/bookings", json={"timeslot_id": slot.id})
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 409, response.text
+
+
+@pytest.mark.asyncio
+async def test__create_booking_route__canceled_timeslot_returns_409(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+        status=TimeSlotStatus.CANCELED,
+    )
+    await db_session.flush()
+
+    response = await async_client.post("/bookings", json={"timeslot_id": slot.id})
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 409, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_user_bookings__returns_empty_list_when_none(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    await db_session.flush()
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+
+    response = await async_client.get("/bookings", headers={"Authorization": "Bearer test"})
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 200, response.text
+    assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test__get_user_bookings__filters_by_room_id(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room_a = await create_room(db_session, faker, location=location)
+    room_b = await create_room(db_session, faker, location=location)
+    slot_a = await create_timeslot(
+        db_session,
+        room=room_a,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    slot_b = await create_timeslot(
+        db_session,
+        room=room_b,
+        start_datetime=datetime.now(timezone.utc) + timedelta(days=1),
+        end_datetime=datetime.now(timezone.utc) + timedelta(days=1, hours=1),
+    )
+    await create_booking(db_session, user=user, room=room_a, timeslot=slot_a)
+    target_booking = await create_booking(db_session, user=user, room=room_b, timeslot=slot_b)
+    await db_session.flush()
+
+    response = await async_client.get(f"/bookings?room_id={room_b.id}")
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["booking"]["id"] == target_booking.id
+
+
+@pytest.mark.asyncio
+async def test__get_user_bookings__invalid_room_id_returns_422(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+
+    response = await async_client.get("/bookings?room_id=bad")
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_user_bookings__filters_by_timeslot_range(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    start = datetime.now(timezone.utc)
+    slot_in_range = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start,
+        end_datetime=start + timedelta(hours=1),
+    )
+    slot_out_of_range = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start + timedelta(days=2),
+        end_datetime=start + timedelta(days=2, hours=1),
+    )
+    target_booking = await create_booking(db_session, user=user, room=room, timeslot=slot_in_range)
+    await create_booking(db_session, user=user, room=room, timeslot=slot_out_of_range)
+    await db_session.flush()
+    params = {
+        "start_datetime": (slot_in_range.start_datetime - timedelta(minutes=5)).isoformat(),
+        "end_datetime": (slot_in_range.end_datetime + timedelta(minutes=5)).isoformat(),
+    }
+
+    response = await async_client.get("/bookings", params=params)
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["booking"]["id"] == target_booking.id
+
+
+@pytest.mark.asyncio
+async def test__get_user_bookings__filters_by_end_only(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    start = datetime.now(timezone.utc)
+    early_slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start,
+        end_datetime=start + timedelta(hours=1),
+    )
+    late_slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start + timedelta(days=2),
+        end_datetime=start + timedelta(days=2, hours=1),
+    )
+    early_booking = await create_booking(db_session, user=user, room=room, timeslot=early_slot)
+    await create_booking(db_session, user=user, room=room, timeslot=late_slot)
+    await db_session.flush()
+
+    params = {
+        "end_datetime": (early_slot.end_datetime + timedelta(minutes=1)).isoformat(),
+    }
+    response = await async_client.get("/bookings", params=params)
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["booking"]["id"] == early_booking.id
+
+@pytest.mark.asyncio
+async def test__get_user_bookings__filters_by_start_only(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    start = datetime.now(timezone.utc)
+    early_slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start,
+        end_datetime=start + timedelta(hours=1),
+    )
+    late_slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start + timedelta(days=2),
+        end_datetime=start + timedelta(days=2, hours=1),
+    )
+    await create_booking(db_session, user=user, room=room, timeslot=early_slot)
+    target_booking = await create_booking(db_session, user=user, room=room, timeslot=late_slot)
+    await db_session.flush()
+
+    params = {
+        "start_datetime": (late_slot.start_datetime - timedelta(minutes=1)).isoformat(),
+    }
+    response = await async_client.get("/bookings", params=params)
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["booking"]["id"] == target_booking.id
+
+
+@pytest.mark.asyncio
+async def test__get_all_user_bookings__invalid_status_returns_422(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+
+    response = await async_client.get("/bookings?status=INVALID")
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test__get_user_bookings__invalid_timeslot_range_returns_422(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+
+    response = await async_client.get("/bookings?start_datetime=bad-date")
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_booking_by_id_route__returns_booking_for_user(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    booking = await create_booking(db_session, user=user, room=room, timeslot=slot)
+    await db_session.flush()
+
+    response = await async_client.get(f"/bookings/{booking.id}")
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_booking_by_id_route__works_for_admin(async_client, db_session, faker):
+    admin = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(admin.id), admin=True)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    booking_user = await create_user(db_session, faker)
+    booking = await create_booking(db_session, user=booking_user, room=room, timeslot=slot)
+    await db_session.flush()
+
+    response = await async_client.get(f"/bookings/{booking.id}")
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_booking_by_id_route__forbidden_for_other_user(async_client, db_session, faker):
+    owner = await create_user(db_session, faker)
+    other = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(other.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    booking = await create_booking(db_session, user=owner, room=room, timeslot=slot)
+    await db_session.flush()
+
+    response = await async_client.get(f"/bookings/{booking.id}")
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test__get_booking_by_id_route__requires_auth(async_client):
+    response = await async_client.get("/bookings/1")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test__get_booking_by_id_route__not_found(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+
+    response = await async_client.get("/bookings/9999")
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test__cancel_booking_route__cancels_pending_for_owner(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    booking = await create_booking(db_session, user=user, room=room, timeslot=slot, status=BookingStatus.PENDING_PAYMENTS)
+    await db_session.flush()
+
+    response = await async_client.post(f"/bookings/{booking.id}/cancel")
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 200, response.text
+    assert response.json() is True
+    await db_session.refresh(booking)
+    assert booking.status == BookingStatus.CANCELED
+
+
+@pytest.mark.asyncio
+async def test__cancel_booking_route__requires_auth(async_client):
+    response = await async_client.post("/bookings/1/cancel")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test__cancel_booking_route__not_found(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    await db_session.flush()
+
+    response = await async_client.post("/bookings/9999/cancel")
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test__cancel_booking_route__owner_cannot_cancel_other_users_booking(async_client, db_session, faker):
+    owner = await create_user(db_session, faker)
+    other = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(owner.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    booking = await create_booking(db_session, user=other, room=room, timeslot=slot, status=BookingStatus.PENDING_PAYMENTS)
+    await db_session.flush()
+
+    response = await async_client.post(f"/bookings/{booking.id}/cancel")
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test__cancel_booking_route__admin_can_cancel_others(async_client, db_session, faker):
+    admin = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(admin.id), admin=True)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    booking_user = await create_user(db_session, faker)
+    booking = await create_booking(
+        db_session,
+        user=booking_user,
+        room=room,
+        timeslot=slot,
+        status=BookingStatus.PENDING_PAYMENTS,
+    )
+    await db_session.flush()
+
+    response = await async_client.post(f"/bookings/{booking.id}/cancel")
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 200, response.text
+    assert response.json() is True
+
+
+@pytest.mark.asyncio
+async def test__create_payment_route__requires_auth(async_client):
+    response = await async_client.post("/bookings/1/payments")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test__create_payment_route__invalid_booking_id_returns_422(async_client):
+    token = SAccessToken(sub="1", admin=False)
+    override_token_dependency(async_client.app_ref, token)
+
+    response = await async_client.post(
+        "/bookings/abc/payments",
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__create_payment_route__owner_can_create(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    booking = await create_booking(db_session, user=user, room=room, timeslot=slot)
+    await db_session.flush()
+
+    response = await async_client.post(f"/bookings/{booking.id}/payments")
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["booking_id"] == booking.id
+    stored = await db_session.get(Payment, data["id"])
+    assert stored is not None
+    assert stored.booking_id == booking.id
+
+
+@pytest.mark.asyncio
+async def test__create_payment_route__duplicate_payment_returns_409(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    booking = await create_booking(db_session, user=user, room=room, timeslot=slot)
+    await db_session.flush()
+
+    first = await async_client.post(f"/bookings/{booking.id}/payments")
+    assert first.status_code == 200, first.text
+
+    second = await async_client.post(f"/bookings/{booking.id}/payments")
+
+    clear_overrides(async_client.app_ref)
+    assert second.status_code == 409, second.text
+
+
+@pytest.mark.asyncio
+async def test__create_payment_route__expired_booking_returns_409(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    booking = await create_booking(
+        db_session,
+        user=user,
+        room=room,
+        timeslot=slot,
+        status=BookingStatus.PENDING_PAYMENTS,
+        expires_delta=timedelta(hours=-1),
+    )
+    await db_session.flush()
+
+    response = await async_client.post(f"/bookings/{booking.id}/payments")
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 409, response.text
+
+
+@pytest.mark.asyncio
+async def test__create_payment_route__canceled_booking_returns_409(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    booking = await create_booking(
+        db_session,
+        user=user,
+        room=room,
+        timeslot=slot,
+        status=BookingStatus.CANCELED,
+        expires_delta=timedelta(hours=1),
+    )
+    await db_session.flush()
+
+    response = await async_client.post(f"/bookings/{booking.id}/payments")
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 409, response.text
+
+
+@pytest.mark.asyncio
+async def test__create_payment_route__paid_booking_returns_409(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    booking = await create_booking(
+        db_session,
+        user=user,
+        room=room,
+        timeslot=slot,
+        status=BookingStatus.PAID,
+        expires_delta=timedelta(hours=1),
+    )
+    await db_session.flush()
+
+    response = await async_client.post(f"/bookings/{booking.id}/payments")
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 409, response.text
+
+
+@pytest.mark.asyncio
+async def test__create_payment_route__other_user_gets_not_found(async_client, db_session, faker):
+    owner = await create_user(db_session, faker)
+    other = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(other.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    booking = await create_booking(db_session, user=owner, room=room, timeslot=slot)
+    await db_session.flush()
+
+    response = await async_client.post(f"/bookings/{booking.id}/payments")
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 404, response.text
+
+
+@pytest.mark.asyncio
+async def test__create_payment_route__missing_booking_returns_404(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token_dependency(async_client.app_ref, token)
+    await db_session.flush()
+
+    response = await async_client.post("/bookings/9999/payments")
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 404, response.text

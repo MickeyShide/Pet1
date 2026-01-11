@@ -1,0 +1,279 @@
+from datetime import datetime, timedelta, timezone
+
+import pytest
+
+from app.models.booking import BookingStatus
+from app.models.payment import PaymentStatus
+from app.repositories.payment import PaymentRepository
+from app.schemas.auth import SAccessToken
+from tests.factories import (
+    create_booking,
+    create_location,
+    create_room,
+    create_timeslot,
+    create_user,
+)
+from tests.integration.api.helpers import clear_overrides, override_token
+
+@pytest.mark.asyncio
+async def test__confirm_payment_route__requires_auth(async_client):
+    response = await async_client.post("/payments/1/confirm")
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test__confirm_payment_route__invalid_payment_id_returns_422(async_client):
+    token = SAccessToken(sub="1", admin=False)
+    override_token(async_client.app_ref, token)
+
+    response = await async_client.post(
+        "/payments/abc/confirm",
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__confirm_payment_route__owner_success_updates_booking(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    start = datetime.now(timezone.utc) - timedelta(days=1)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start,
+        end_datetime=start + timedelta(hours=1),
+    )
+    booking = await create_booking(
+        db_session,
+        user=user,
+        room=room,
+        timeslot=slot,
+        status=BookingStatus.PENDING_PAYMENTS,
+        expires_delta=timedelta(hours=2),
+    )
+    payment = await PaymentRepository(db_session).create(booking_id=booking.id, external_id="ext-123")
+    await db_session.flush()
+
+    response = await async_client.post(
+        f"/payments/{payment.id}/confirm",
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    await db_session.refresh(booking)
+    await db_session.refresh(payment)
+    assert response.status_code == 200, response.text
+    assert booking.status == BookingStatus.PAID
+    assert payment.status == PaymentStatus.SUCCESS
+    assert response.json()["status"] == PaymentStatus.SUCCESS
+
+
+@pytest.mark.asyncio
+async def test__confirm_payment_route__expired_booking_returns_409(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    start = datetime.now(timezone.utc)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start,
+        end_datetime=start + timedelta(hours=1),
+    )
+    booking = await create_booking(
+        db_session,
+        user=user,
+        room=room,
+        timeslot=slot,
+        status=BookingStatus.PENDING_PAYMENTS,
+        expires_delta=timedelta(hours=-1),
+    )
+    payment = await PaymentRepository(db_session).create(booking_id=booking.id, external_id="ext-124")
+    await db_session.flush()
+
+    response = await async_client.post(
+        f"/payments/{payment.id}/confirm",
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 409
+    await db_session.refresh(payment)
+    assert payment.status == PaymentStatus.CREATED
+
+
+@pytest.mark.asyncio
+async def test__confirm_payment_route__already_paid_is_idempotent(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    start = datetime.now(timezone.utc)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start,
+        end_datetime=start + timedelta(hours=1),
+    )
+    booking = await create_booking(
+        db_session,
+        user=user,
+        room=room,
+        timeslot=slot,
+        status=BookingStatus.PENDING_PAYMENTS,
+        expires_delta=timedelta(hours=1),
+    )
+    payment = await PaymentRepository(db_session).create(booking_id=booking.id, external_id="ext-124")
+    await db_session.flush()
+
+    first = await async_client.post(
+        f"/payments/{payment.id}/confirm",
+        headers={"Authorization": "Bearer test"},
+    )
+    second = await async_client.post(
+        f"/payments/{payment.id}/confirm",
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert first.status_code == 200, first.text
+    assert second.status_code == 200, second.text
+    await db_session.refresh(booking)
+    await db_session.refresh(payment)
+    assert booking.status == BookingStatus.PAID
+    assert payment.status == PaymentStatus.SUCCESS
+
+
+@pytest.mark.asyncio
+async def test__confirm_payment_route__canceled_booking_returns_409(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    start = datetime.now(timezone.utc)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start,
+        end_datetime=start + timedelta(hours=1),
+    )
+    booking = await create_booking(
+        db_session,
+        user=user,
+        room=room,
+        timeslot=slot,
+        status=BookingStatus.CANCELED,
+        expires_delta=timedelta(hours=1),
+    )
+    payment = await PaymentRepository(db_session).create(booking_id=booking.id, external_id="ext-127")
+    await db_session.flush()
+
+    response = await async_client.post(
+        f"/payments/{payment.id}/confirm",
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 409, response.text
+    await db_session.refresh(payment)
+    assert payment.status == PaymentStatus.CREATED
+
+@pytest.mark.asyncio
+async def test__confirm_payment_route__not_found_payment(async_client, db_session, faker):
+    user = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(user.id), admin=False)
+    override_token(async_client.app_ref, token)
+    await db_session.flush()
+
+    response = await async_client.post(
+        "/payments/9999/confirm",
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test__confirm_payment_route__forbidden_for_other_user(async_client, db_session, faker):
+    owner = await create_user(db_session, faker)
+    other = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(other.id), admin=False)
+    override_token(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    start = datetime.now(timezone.utc) - timedelta(days=1)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start,
+        end_datetime=start + timedelta(hours=1),
+    )
+    booking = await create_booking(
+        db_session,
+        user=owner,
+        room=room,
+        timeslot=slot,
+        status=BookingStatus.PENDING_PAYMENTS,
+        expires_delta=timedelta(hours=-2),
+    )
+    payment = await PaymentRepository(db_session).create(booking_id=booking.id, external_id="ext-125")
+    await db_session.flush()
+
+    response = await async_client.post(
+        f"/payments/{payment.id}/confirm",
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test__confirm_payment_route__admin_can_confirm_other(async_client, db_session, faker):
+    admin = await create_user(db_session, faker)
+    token = SAccessToken(sub=str(admin.id), admin=True)
+    override_token(async_client.app_ref, token)
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    start = datetime.now(timezone.utc) - timedelta(days=1)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start,
+        end_datetime=start + timedelta(hours=1),
+    )
+    owner = await create_user(db_session, faker)
+    booking = await create_booking(
+        db_session,
+        user=owner,
+        room=room,
+        timeslot=slot,
+        status=BookingStatus.PENDING_PAYMENTS,
+        expires_delta=timedelta(hours=2),
+    )
+    payment = await PaymentRepository(db_session).create(booking_id=booking.id, external_id="ext-126")
+    await db_session.flush()
+
+    response = await async_client.post(
+        f"/payments/{payment.id}/confirm",
+        headers={"Authorization": "Bearer test"},
+    )
+
+    clear_overrides(async_client.app_ref)
+    await db_session.refresh(booking)
+    await db_session.refresh(payment)
+    assert response.status_code == 200, response.text
+    assert booking.status == BookingStatus.PAID
+    assert payment.status == PaymentStatus.SUCCESS
+    assert response.json()["status"] == PaymentStatus.SUCCESS

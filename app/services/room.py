@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
+from typing import overload
 
 from app.models import Room
 from app.models.room import TimeSlotType
@@ -39,17 +40,33 @@ class RoomService(BaseService[Room]):
             end_datetime=date_to,
         )
 
+    @overload
     async def get_price_quote(
-            self,
-            room_id: int,
-            date_from: datetime,
-            date_to: datetime,
+        self,
+        booking_data: SBookingCreateFlexible,
     ) -> Decimal:
-        hour_price: Decimal = await self._repository.get_hour_price(room_id)
+        ...
 
-        duration_seconds = Decimal(
-            (date_to - date_from).total_seconds()
-        )
+    @overload
+    async def get_price_quote(
+        self,
+        booking_data: int,
+        date_from: datetime,
+        date_to: datetime,
+    ) -> Decimal:
+        ...
+
+    async def get_price_quote(
+        self,
+        booking_data: SBookingCreateFlexible | int,
+        date_from: datetime | None = None,
+        date_to: datetime | None = None,
+    ) -> Decimal:
+        data = self._coerce_booking_data(booking_data, date_from, date_to)
+
+        hour_price: Decimal = await self._repository.get_hour_price(data.room_id)
+
+        duration_seconds = Decimal((data.end_datetime - data.start_datetime).total_seconds())
         hours = duration_seconds / 3600
 
         total_price = hour_price * hours
@@ -58,9 +75,8 @@ class RoomService(BaseService[Room]):
 
     @staticmethod
     async def check_flexible_booking(
-            room: Room,
-            start_datetime: datetime,
-            end_datetime: datetime
+        room: Room,
+        booking_data: SBookingCreateFlexible,
     ) -> None:
         """
         checks: timeslot type IS flexible, timeslot datetimes is correct
@@ -72,21 +88,21 @@ class RoomService(BaseService[Room]):
 
         min_minutes = room.min_booking_duration_minutes
         step_minutes = room.booking_step_minutes
-        start = start_datetime
-        end = end_datetime
+        start = booking_data.start_datetime
+        end = booking_data.end_datetime
         delta = end - start
         duration_minutes = delta.days * 24 * 60 + delta.seconds // 60
         start_minute_of_day = start.hour * 60 + start.minute
 
         if (
-                start.second != 0
-                or start.microsecond != 0
-                or end.second != 0
-                or end.microsecond != 0
-                or delta.microseconds != 0
-                or delta.seconds % 60 != 0
-                or duration_minutes < min_minutes
-                or start_minute_of_day % step_minutes != 0
-                or duration_minutes % step_minutes != 0
+            start.second != 0
+            or start.microsecond != 0
+            or end.second != 0
+            or end.microsecond != 0
+            or delta.microseconds != 0
+            or delta.seconds % 60 != 0
+            or duration_minutes < min_minutes
+            or start_minute_of_day % step_minutes != 0
+            or duration_minutes % step_minutes != 0
         ):
             raise InvalidBookingDuration(min_minutes=min_minutes, step_minutes=step_minutes)

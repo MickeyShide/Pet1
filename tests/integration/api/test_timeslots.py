@@ -1,0 +1,381 @@
+from datetime import datetime, timedelta, timezone
+
+import pytest
+from sqlalchemy import select
+
+from app.models import TimeSlot
+from app.models.timeslot import TimeSlotStatus
+from tests.factories import (
+    create_location,
+    create_room,
+    create_timeslot,
+)
+from tests.integration.api.helpers import clear_overrides, override_admin_token, override_user_token
+
+def auth_header():
+    return {"Authorization": "Bearer stub"}
+
+
+@pytest.mark.asyncio
+async def test__get_timeslots_by_range_returns_empty(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    await db_session.flush()
+
+    start = datetime.now(timezone.utc)
+    end = start + timedelta(hours=1)
+    params = {"room_id": room.id, "date_from": start.isoformat(), "date_to": end.isoformat()}
+    response = await async_client.get("/timeslots", params=params)
+
+    assert response.status_code == 200, response.text
+    assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test__get_timeslots_by_range_returns_items(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    start = datetime(2025, 1, 1, 10, 30, tzinfo=timezone.utc)
+    end = start + timedelta(hours=1, minutes=30)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start,
+        end_datetime=end,
+    )
+    await db_session.flush()
+
+    params = {
+        "room_id": room.id,
+        "date_from": (start - timedelta(minutes=5)).isoformat(),
+        "date_to": (end + timedelta(minutes=5)).isoformat(),
+    }
+    response = await async_client.get("/timeslots", params=params)
+
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert len(data) == 1
+    item = data[0]
+    assert item["id"] == str(slot.id)
+    assert item["date_from"] == start.isoformat()
+    assert item["date_to"] == end.isoformat()
+    assert item["label"] == "10:30 - 12:00"
+    assert item["hours"] == pytest.approx(1.5)
+
+
+@pytest.mark.asyncio
+async def test__get_timeslots_by_range_includes_canceled(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    start = datetime(2025, 1, 1, 10, 30, tzinfo=timezone.utc)
+    end = start + timedelta(hours=1)
+    slot_active = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start,
+        end_datetime=end,
+    )
+    slot_canceled = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start + timedelta(hours=2),
+        end_datetime=start + timedelta(hours=3),
+        status=TimeSlotStatus.CANCELED,
+    )
+    await db_session.flush()
+
+    params = {
+        "room_id": room.id,
+        "date_from": (start - timedelta(minutes=5)).isoformat(),
+        "date_to": (slot_canceled.end_datetime + timedelta(minutes=5)).isoformat(),
+    }
+    response = await async_client.get("/timeslots", params=params)
+
+    assert response.status_code == 200, response.text
+    ids = {item["id"] for item in response.json()}
+    assert str(slot_active.id) in ids
+    assert str(slot_canceled.id) in ids
+
+
+@pytest.mark.asyncio
+async def test__get_timeslots_by_range_missing_room_id_returns_422(async_client):
+    start = datetime.now(timezone.utc)
+    end = start + timedelta(hours=1)
+    params = {"date_from": start.isoformat(), "date_to": end.isoformat()}
+    response = await async_client.get("/timeslots", params=params)
+
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_timeslots_by_range_missing_date_from_returns_422(async_client):
+    end = datetime.now(timezone.utc) + timedelta(hours=1)
+    params = {"room_id": 1, "date_to": end.isoformat()}
+    response = await async_client.get("/timeslots", params=params)
+
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_timeslots_by_range_missing_date_to_uses_full_day(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    start = datetime(2025, 1, 1, 10, 30, tzinfo=timezone.utc)
+    end = start + timedelta(hours=1)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=start,
+        end_datetime=end,
+    )
+    await db_session.flush()
+
+    params = {"room_id": room.id, "date_from": start.isoformat()}
+    response = await async_client.get("/timeslots", params=params)
+
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["id"] == str(slot.id)
+
+
+@pytest.mark.asyncio
+async def test__get_timeslots_by_range_invalid_room_id_returns_422(async_client):
+    start = datetime.now(timezone.utc)
+    end = start + timedelta(hours=1)
+    params = {"room_id": "bad", "date_from": start.isoformat(), "date_to": end.isoformat()}
+    response = await async_client.get("/timeslots", params=params)
+
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_timeslots_by_range_invalid_date_from_returns_422(async_client):
+    params = {"room_id": 1, "date_from": "not-a-date", "date_to": "2025-01-01T12:00:00Z"}
+    response = await async_client.get("/timeslots", params=params)
+
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_timeslots_by_range_invalid_date_to_returns_422(async_client):
+    params = {"room_id": 1, "date_from": "2025-01-01T10:00:00Z", "date_to": "bad"}
+    response = await async_client.get("/timeslots", params=params)
+
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__get_timeslots_by_range_date_to_before_date_from_returns_422(async_client):
+    params = {
+        "room_id": 1,
+        "date_from": "2025-01-02T12:00:00Z",
+        "date_to": "2025-01-01T12:00:00Z",
+    }
+    response = await async_client.get("/timeslots", params=params)
+
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__update_timeslot_requires_admin(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    await db_session.flush()
+    override_user_token(async_client.app_ref)
+
+    response = await async_client.patch(
+        f"/timeslots/{slot.id}",
+        json={"base_price": 500},
+        headers=auth_header(),
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test__update_timeslot_requires_auth(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    await db_session.flush()
+
+    response = await async_client.patch(
+        f"/timeslots/{slot.id}",
+        json={"base_price": 500},
+    )
+
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test__update_timeslot_with_admin(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+        base_price=100,
+    )
+    await db_session.flush()
+    override_admin_token(async_client.app_ref)
+
+    response = await async_client.patch(
+        f"/timeslots/{slot.id}",
+        json={"base_price": 200},
+        headers=auth_header(),
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 200, response.text
+    await db_session.refresh(slot)
+    assert slot.base_price == 200
+
+
+@pytest.mark.asyncio
+async def test__update_timeslot_empty_payload_returns_422(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    await db_session.flush()
+    override_admin_token(async_client.app_ref)
+
+    response = await async_client.patch(
+        f"/timeslots/{slot.id}",
+        json={},
+        headers=auth_header(),
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__update_timeslot_invalid_status_returns_422(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+        base_price=100,
+    )
+    await db_session.flush()
+    override_admin_token(async_client.app_ref)
+
+    response = await async_client.patch(
+        f"/timeslots/{slot.id}",
+        json={"status": "BAD"},
+        headers=auth_header(),
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test__delete_timeslot_requires_admin(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    await db_session.flush()
+    override_user_token(async_client.app_ref)
+
+    slot_id = slot.id
+    response = await async_client.delete(f"/timeslots/{slot_id}", headers=auth_header())
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test__delete_timeslot_requires_auth(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    await db_session.flush()
+
+    response = await async_client.delete(f"/timeslots/{slot.id}")
+
+    assert response.status_code == 401
+@pytest.mark.asyncio
+async def test__delete_timeslot_with_admin(async_client, db_session, faker):
+    location = await create_location(db_session, faker)
+    room = await create_room(db_session, faker, location=location)
+    slot = await create_timeslot(
+        db_session,
+        room=room,
+        start_datetime=datetime.now(timezone.utc),
+        end_datetime=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    await db_session.flush()
+    override_admin_token(async_client.app_ref)
+
+    slot_id = slot.id
+    response = await async_client.delete(f"/timeslots/{slot_id}", headers=auth_header())
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 204
+    db_session.expire_all()
+    result = await db_session.execute(
+        select(TimeSlot).where(TimeSlot.id == slot_id)
+    )
+    remaining = result.scalar_one_or_none()
+    assert remaining is None
+
+
+@pytest.mark.asyncio
+async def test__update_timeslot_not_found_returns_404(async_client):
+    override_admin_token(async_client.app_ref)
+
+    response = await async_client.patch(
+        "/timeslots/9999",
+        json={"base_price": 200},
+        headers=auth_header(),
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test__delete_timeslot_not_found_returns_404(async_client):
+    override_admin_token(async_client.app_ref)
+
+    response = await async_client.delete(
+        "/timeslots/9999",
+        headers=auth_header(),
+    )
+
+    clear_overrides(async_client.app_ref)
+    assert response.status_code == 404

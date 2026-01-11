@@ -65,4 +65,4 @@ class BookingService(BaseService[Booking]):
 
             return False
         except NoResultFound:
-            raise NotFoundException(f"Booking with id {booking_id} not found")
+            raise BookingNotFound()
