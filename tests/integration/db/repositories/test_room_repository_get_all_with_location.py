@@ -1,6 +1,7 @@
 import pytest
 
 from app.repositories.room import RoomRepository
+from app.schemas.room import SRoomFilter
 from tests.factories import create_location, create_room
 
 
@@ -32,7 +33,7 @@ async def test__get_all_with_location__filters_and_orders(db_session, faker):
     repo = RoomRepository(db_session)
 
     # When
-    rooms = await repo.get_all_with_location(is_active=True, desc=False)
+    rooms = await repo.get_all_with_location(filters=SRoomFilter(is_active=True), desc=False)
 
     # Then
     ids = [room.id for room in rooms]

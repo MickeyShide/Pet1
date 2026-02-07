@@ -24,10 +24,12 @@ class RoomBusinessService(BaseBusinessService):
     @new_session(readonly=True)
     async def get_all_with_location(
             self,
-            filters: SRoomFilter,
-            page: int,
-            limit: int,
+            filters: SRoomFilter | None = None,
+            page: int | None = None,
+            limit: int | None = None,
     ) -> list[SRoomOutWithLocation]:
+        if filters is None:
+            filters = SRoomFilter()
         rooms: list[Room] = await self.room_service.get_all_with_location(filters, page, limit)
 
         return [SRoomOutWithLocation.from_model(room) for room in rooms]

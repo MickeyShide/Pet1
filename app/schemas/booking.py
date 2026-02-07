@@ -1,6 +1,8 @@
 from datetime import datetime
 from decimal import Decimal
 
+from pydantic import Field
+
 from app.models.booking import BookingStatus
 from app.schemas import BaseSchema
 from app.schemas.room import SRoomOut
@@ -46,5 +48,5 @@ class SBookingCreateFlexible(BaseSchema):
 
 
 class SBookingFilters(BaseSchema):
-    room_id: int | None = None
-    status: BookingStatus | None = None
+    room_id: int | None = Field(default_factory=BaseSchema.unset)
+    status: BookingStatus | None = Field(default_factory=BaseSchema.unset)

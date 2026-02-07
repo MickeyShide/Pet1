@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from app.models.room import RoomType, TimeSlotType
 from app.schemas import BaseSchema
@@ -22,16 +22,16 @@ class SRoomBase(BaseSchema):
     is_active: bool
 
 class SRoomFilter(BaseSchema):
-    location_id: int | None = None
-    name: str | None = None
-    capacity: int | None = None
-    description: str | None = None
-    type: RoomType | None = None
-    time_slot_type: TimeSlotType | None = None
-    min_booking_duration_minutes: int | None = None
-    booking_step_minutes: int | None = None
-    hour_price: Decimal | None = None
-    is_active: bool | None = None
+    location_id: int | None = Field(default_factory=BaseSchema.unset)
+    name: str | None = Field(default_factory=BaseSchema.unset)
+    capacity: int | None = Field(default_factory=BaseSchema.unset)
+    description: str | None = Field(default_factory=BaseSchema.unset)
+    type: RoomType | None = Field(default_factory=BaseSchema.unset)
+    time_slot_type: TimeSlotType | None = Field(default_factory=BaseSchema.unset)
+    min_booking_duration_minutes: int | None = Field(default_factory=BaseSchema.unset)
+    booking_step_minutes: int | None = Field(default_factory=BaseSchema.unset)
+    hour_price: Decimal | None = Field(default_factory=BaseSchema.unset)
+    is_active: bool | None = Field(default_factory=BaseSchema.unset)
 
 
 class SRoomOut(SRoomBase):

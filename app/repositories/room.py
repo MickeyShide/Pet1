@@ -50,11 +50,13 @@ class RoomRepository(BaseRepository[Room]):
 
     async def get_all_with_location(
             self,
-            filters: SRoomFilter,
-            page: int | None = None,
+            filters: SRoomFilter | None = None,
+            *,
+            desc: bool = True,
+            offset: int | None = None,
             limit: int | None = None,
+            page: int | None = None
     ) -> List[Room]:
-        print(filters.to_dict())
         query = (
             select(self._model_cls)
             .options(
@@ -63,11 +65,28 @@ class RoomRepository(BaseRepository[Room]):
                 selectinload(self._model_cls.location).selectinload(Location.images),
                 selectinload(self._model_cls.location).selectinload(Location.features),
             )
-            .filter_by(**filters.to_dict())
         )
 
-        if page is not None:
-            query = query.offset(page*limit)
+        filters_dict = filters.to_dict() if filters is not None else {}
+        capacity = filters_dict.pop("capacity", None)
+
+        if filters_dict:
+            query = query.filter_by(**filters_dict)
+
+        if capacity is not None:
+            query = query.where(self._model_cls.capacity == capacity)
+
+        if desc:
+            query = query.order_by(self._model_cls.id.desc())
+        else:
+            query = query.order_by(self._model_cls.id)
+
+        effective_offset = offset
+        if effective_offset is None and page is not None and limit is not None:
+            effective_offset = page * limit
+
+        if effective_offset is not None:
+            query = query.offset(effective_offset)
         if limit is not None:
             query = query.limit(limit)
 

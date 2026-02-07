@@ -10,7 +10,9 @@ from pydantic import ValidationError
 
 from app.config import settings
 from app.schemas.auth import SAccessToken
-from app.schemas.timeslot import STimeSlotDateRange
+from app.models.booking import BookingStatus
+from app.schemas.booking import SBookingFilters
+from app.schemas.timeslot import STimeSlotDateRange, STimeSlotFilters
 from app.utils.err.base.forbidden import ForbiddenException
 from app.utils.err.base.unauthorized import UnauthorizedException
 
@@ -60,3 +62,31 @@ def _build_timeslot_date_range(
 
 
 TimeSlotDateRangeDepends = Annotated[STimeSlotDateRange, Depends(_build_timeslot_date_range)]
+
+
+def _build_booking_filters(
+        room_id: int | None = Query(None),
+        status: BookingStatus | None = Query(None),
+) -> SBookingFilters:
+    payload: dict[str, object] = {}
+    if room_id is not None:
+        payload["room_id"] = room_id
+    if status is not None:
+        payload["status"] = status
+    return SBookingFilters(**payload)
+
+
+def _build_timeslot_filters(
+        start_datetime: datetime | None = Query(None),
+        end_datetime: datetime | None = Query(None),
+) -> STimeSlotFilters:
+    payload: dict[str, object] = {}
+    if start_datetime is not None:
+        payload["start_datetime"] = start_datetime
+    if end_datetime is not None:
+        payload["end_datetime"] = end_datetime
+    return STimeSlotFilters(**payload)
+
+
+BookingFiltersDepends = Annotated[SBookingFilters, Depends(_build_booking_filters)]
+TimeSlotFiltersDepends = Annotated[STimeSlotFilters, Depends(_build_timeslot_filters)]

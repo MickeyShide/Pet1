@@ -30,10 +30,12 @@ router = APIRouter(prefix="/rooms", tags=["Rooms"])
     },
 )
 async def get_all_rooms_route(
-        filters: SRoomFilter = Depends(SRoomFilter),
+        filters: SRoomFilter | None = None,
         page: int = Query(default=0),
         limit: int = Query(default=5),
 ) -> list[SRoomOutWithLocation]:
+    if filters is None:
+        filters = SRoomFilter()
     return await RoomBusinessService().get_all_with_location(filters, page, limit)
 
 

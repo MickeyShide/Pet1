@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from app.models.timeslot import TimeSlotStatus
 from app.schemas import BaseSchema
@@ -89,5 +89,5 @@ class STimeSlotUpdate(BaseSchema):
 
 
 class STimeSlotFilters(BaseSchema):
-    start_datetime: datetime | None = None
-    end_datetime: datetime | None = None
+    start_datetime: datetime | None = Field(default_factory=BaseSchema.unset)
+    end_datetime: datetime | None = Field(default_factory=BaseSchema.unset)

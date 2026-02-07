@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from starlette import status
 
 from app.api import docs
-from app.api.deps import UserDepends
+from app.api.deps import BookingFiltersDepends, TimeSlotFiltersDepends, UserDepends
 from app.schemas.booking import (
     SBookingCreate,
     SBookingOutAfterCreate,
@@ -200,8 +200,8 @@ async def create_booking_flexible_route(
 )
 async def get_all_user_bookings(
         token_data: UserDepends,
-        booking_filters: SBookingFilters = Depends(),
-        timeslot_filters: STimeSlotFilters = Depends()
+        booking_filters: BookingFiltersDepends,
+        timeslot_filters: TimeSlotFiltersDepends
 ) -> List[SBookingOutWithTimeslots]:
     return await BookingsBusinessService(token_data).get_my_bookings(
         booking_filters=booking_filters,

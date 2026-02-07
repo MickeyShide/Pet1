@@ -16,10 +16,12 @@ class RoomService(BaseService[Room]):
 
     async def get_all_with_location(
             self,
-            filters: SRoomFilter,
-            page: int,
-            limit: int,
+            filters: SRoomFilter | None = None,
+            page: int | None = None,
+            limit: int | None = None,
     ) -> list[Room]:
+        if filters is None:
+            filters = SRoomFilter()
         return await self._repository.get_all_with_location(filters=filters, page=page, limit=limit)
 
     @staticmethod

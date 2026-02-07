@@ -6,6 +6,7 @@ from sqlalchemy.orm import selectinload
 from app.models import Booking, Room, TimeSlot
 from app.models.booking import BookingStatus
 from app.repositories.base import BaseRepository
+from app.schemas import BaseSchema
 from app.schemas.booking import SBookingFilters
 from app.schemas.timeslot import STimeSlotFilters
 
@@ -28,14 +29,16 @@ class BookingRepository(BaseRepository[Booking]):
 
         if booking_filters is not None:
             for column, value in booking_filters.to_dict().items():
-                if value is not None:
+                if value is not None and value is not BaseSchema.UNSET:
                     stmt = stmt.where(getattr(self._model_cls, column) == value)
 
         if timeslot_filters is not None:
-            if timeslot_filters.start_datetime is not None:
-                stmt = stmt.where(TimeSlot.end_datetime >= timeslot_filters.start_datetime)
-            if timeslot_filters.end_datetime is not None:
-                stmt = stmt.where(TimeSlot.start_datetime <= timeslot_filters.end_datetime)
+            start_datetime = timeslot_filters.start_datetime
+            end_datetime = timeslot_filters.end_datetime
+            if start_datetime is not None and start_datetime is not BaseSchema.UNSET:
+                stmt = stmt.where(TimeSlot.end_datetime >= start_datetime)
+            if end_datetime is not None and end_datetime is not BaseSchema.UNSET:
+                stmt = stmt.where(TimeSlot.start_datetime <= end_datetime)
 
         stmt = stmt.order_by(self._model_cls.created_at)
 

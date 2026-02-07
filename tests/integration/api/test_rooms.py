@@ -324,6 +324,7 @@ async def test__get_all_rooms_returns_locations(async_client, db_session, faker)
     assert response.status_code == 200
     payload = response.json()
     ids = {item["id"] for item in payload}
+    print(ids)
     assert {room_a.id, room_b.id}.issubset(ids)
     for item in payload:
         assert item["location"]["id"] == location.id
