@@ -74,7 +74,7 @@ class RoomRepository(BaseRepository[Room]):
             query = query.filter_by(**filters_dict)
 
         if capacity is not None:
-            query = query.where(self._model_cls.capacity == capacity)
+            query = query.where(self._model_cls.capacity >= capacity)
 
         if desc:
             query = query.order_by(self._model_cls.id.desc())
