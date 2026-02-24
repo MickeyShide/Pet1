@@ -5,9 +5,11 @@ from .images import router as images_router
 from .locations import router as locations_router
 from .payments import router as payments_router
 from .rooms import router as rooms_router
+from .system import router as system_router
 from .timeslots import router as timeslots_router
 
 __all__ = [
+    system_router,
     auth_router,
     features_router,
     images_router,
