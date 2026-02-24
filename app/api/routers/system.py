@@ -39,12 +39,12 @@ def _probe_rabbitmq() -> None:
         conn.connect()
 
 
-async def _check_rabbitmq() -> tuple[bool, str]:
+async def _check_rabbitmq() -> bool:
     try:
         await anyio.to_thread.run_sync(_probe_rabbitmq)
-        return True, "ok"
+        return True
     except Exception as exc:
-        return False, str(exc)
+        return False
 
 
 @router.get("/health")
