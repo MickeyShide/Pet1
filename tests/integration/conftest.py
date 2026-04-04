@@ -76,7 +76,7 @@ async def _get_test_session(*, readonly: bool = False) -> AsyncIterator[AsyncSes
             await session.flush()
             if nested is not None and nested.is_active:
                 await nested.commit()
-    except Exception:
+    except BaseException:
         if nested is not None and nested.is_active:
             await nested.rollback()
         raise
@@ -191,12 +191,12 @@ def _mock_celery_apply_async(monkeypatch):
     """
     try:
         import app.celery_app.manager as celery_manager
-    except Exception:
+    except BaseException:
         celery_manager = None
 
     try:
         import app.services.business.bookings as bookings_module
-    except Exception:
+    except BaseException:
         return
 
     if celery_manager is not None:
@@ -207,3 +207,4 @@ def _mock_celery_apply_async(monkeypatch):
 
     if hasattr(bookings_module, "expire_booking"):
         monkeypatch.setattr(bookings_module.expire_booking, "apply_async", lambda *args, **kwargs: None)
+

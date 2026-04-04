@@ -58,7 +58,7 @@ async def get_session(*, readonly: bool = False):
                 yield session
                 if session.in_transaction():
                     await session.commit()
-            except Exception:
+            except BaseException:
                 with contextlib.suppress(InvalidRequestError):
                     if session.in_transaction():
                         await session.rollback()
@@ -91,3 +91,4 @@ def new_session(*, readonly: bool = False):
         return wrapper
 
     return decorator
+
