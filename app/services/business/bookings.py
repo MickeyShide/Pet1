@@ -37,13 +37,16 @@ class BookingsBusinessService(BaseBusinessService):
     async def create_booking(self, booking_data: SBookingCreate) -> SBookingOutAfterCreate:
         timeslot: TimeSlot = await self.timeslot_service.lock_time_slot_for_booking(booking_data.timeslot_id)
 
-        new_booking: Booking = await self.booking_service.create(
-            user_id=self.user_id,
-            room_id=timeslot.room_id,
-            timeslot_id=timeslot.id,
-            total_price=timeslot.base_price,
-            expires_at=datetime.now(UTC) + timedelta(seconds=settings.BOOKING_EXPIRE_SECONDS),
-        )
+        try:
+            new_booking: Booking = await self.booking_service.create(
+                user_id=self.user_id,
+                room_id=timeslot.room_id,
+                timeslot_id=timeslot.id,
+                total_price=timeslot.base_price,
+                expires_at=datetime.now(UTC) + timedelta(seconds=settings.BOOKING_EXPIRE_SECONDS),
+            )
+        except IntegrityError:
+            raise SlotAlreadyTaken()
 
         await CeleryManager.expire_booking(booking=new_booking)
 
