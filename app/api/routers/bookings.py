@@ -346,6 +346,19 @@ async def cancel_booking(
                     "Payment already exists",
                     {"detail": "Payment already exists"},
                 ),
+                "provider_rejected": docs.example(
+                    "Provider rejected",
+                    {"detail": "card declined"},
+                ),
+            },
+        ),
+        status.HTTP_503_SERVICE_UNAVAILABLE: docs.error_response(
+            "Service Unavailable",
+            {
+                "provider_unavailable": docs.example(
+                    "Provider unavailable",
+                    {"detail": "Payment provider is unavailable for create_payment"},
+                )
             },
         ),
     },

@@ -49,6 +49,19 @@ router = APIRouter(prefix="/payments", tags=["Payments"])
                     "Booking cannot be paid",
                     {"detail": "Booking cannot be paid"},
                 ),
+                "provider_rejected": docs.example(
+                    "Provider rejected",
+                    {"detail": "card declined"},
+                ),
+            },
+        ),
+        status.HTTP_503_SERVICE_UNAVAILABLE: docs.error_response(
+            "Service Unavailable",
+            {
+                "provider_unavailable": docs.example(
+                    "Provider unavailable",
+                    {"detail": "Payment provider is unavailable for confirm_payment"},
+                )
             },
         ),
     },

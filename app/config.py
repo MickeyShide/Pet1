@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     TIMESLOT_CACHE_TTL_SECONDS: int = 30
     API_GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS: int = 25
     API_SHUTDOWN_RETRY_AFTER_SECONDS: int = 15
+    PAYMENT_RETRY_MAX_ATTEMPTS: int = 3
+    PAYMENT_RETRY_BASE_DELAY_SECONDS: float = 0.2
+    PAYMENT_RETRY_MAX_DELAY_SECONDS: float = 2.0
 
     @field_validator("DEBUG", mode="before")
     @classmethod
