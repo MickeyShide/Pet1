@@ -64,6 +64,12 @@ async def _expire_booking(booking_id: int) -> dict[str, Any]:
             await CacheService().delete_pattern(cache_keys.timeslots_room_prefix(room_id))
 
             return {"booking_id": booking_id_db, "status": status}
+        except asyncio.CancelledError:
+            try:
+                await session.rollback()
+            except Exception:
+                pass
+            raise
         except Exception as exc:
             try:
                 await session.rollback()
