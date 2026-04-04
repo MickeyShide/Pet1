@@ -133,7 +133,9 @@ services:
         condition: service_healthy
     volumes:
       - ../:/var/www
-    command: ["app.main:app", "--host", "0.0.0.0", "--port", "4000", "--reload"]
+    command: ["app.main:app", "--host", "0.0.0.0", "--port", "4000", "--reload", "--timeout-graceful-shutdown", "25"]
+    stop_signal: SIGTERM
+    stop_grace_period: 30s
     networks:
       - local-net
 
@@ -186,6 +188,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+    stop_signal: SIGTERM
+    stop_grace_period: 45s
     networks:
       - local-net
 

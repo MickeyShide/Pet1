@@ -39,6 +39,7 @@ def test_get_real_ip_uses_client_as_last_resort():
 @pytest.mark.asyncio
 async def test_lifespan_calls_init_and_cleanup(monkeypatch):
     calls: list[str] = []
+    shutdown_calls: list[str] = []
 
     def fake_init_engine(echo: bool = False):
         calls.append(f"init_engine:{echo}")
@@ -52,10 +53,19 @@ async def test_lifespan_calls_init_and_cleanup(monkeypatch):
     async def fake_dispose():
         calls.append("dispose_engine")
 
+    class FakeShutdownState:
+        def begin_draining(self, reason: str):
+            shutdown_calls.append(f"begin:{reason}")
+
+        async def wait_for_active_requests(self, timeout_seconds: int) -> bool:
+            shutdown_calls.append(f"wait:{timeout_seconds}")
+            return True
+
     monkeypatch.setattr(main, "init_engine", fake_init_engine)
     monkeypatch.setattr(main, "init_redis", fake_init_redis)
     monkeypatch.setattr(main, "close_redis", fake_close_redis)
     monkeypatch.setattr(main, "dispose_engine", fake_dispose)
+    monkeypatch.setattr(main, "get_graceful_shutdown_state", lambda app: FakeShutdownState())
 
     app = FastAPI(lifespan=main.lifespan)
     async with main.lifespan(app):
@@ -64,6 +74,8 @@ async def test_lifespan_calls_init_and_cleanup(monkeypatch):
 
     assert "close_redis" in calls
     assert "dispose_engine" in calls
+    assert "begin:lifespan_shutdown" in shutdown_calls
+    assert f"wait:{main.settings.API_GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS}" in shutdown_calls
 
 
 @pytest.mark.asyncio
@@ -89,10 +101,11 @@ async def test_debug_ip_endpoint_returns_all_ips():
 def test_main_dunder_main_runs_uvicorn(monkeypatch):
     called: dict[str, object] = {}
 
-    def fake_run(app: str, host: str, port: int):
+    def fake_run(app: FastAPI, host: str, port: int, timeout_graceful_shutdown: int):
         called["app"] = app
         called["host"] = host
         called["port"] = port
+        called["timeout_graceful_shutdown"] = timeout_graceful_shutdown
 
     fake_uvicorn = types.SimpleNamespace(run=fake_run)
     monkeypatch.setitem(sys.modules, "uvicorn", fake_uvicorn)
@@ -102,6 +115,7 @@ def test_main_dunder_main_runs_uvicorn(monkeypatch):
 
     runpy.run_module("app.main", run_name="__main__")
 
-    assert called["app"] == "main:app"
+    assert isinstance(called["app"], FastAPI)
     assert called["host"] == "0.0.0.0"
     assert called["port"] == 4000
+    assert called["timeout_graceful_shutdown"] == main.settings.API_GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS

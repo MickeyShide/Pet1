@@ -7,16 +7,20 @@ from starlette.requests import Request
 from app.api import routers
 from app.config import settings
 from app.db.base import init_engine, dispose_engine
+from app.graceful_shutdown import get_graceful_shutdown_state, install_graceful_shutdown
 from app.utils.redis import init_redis, close_redis
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    shutdown_state = get_graceful_shutdown_state(app)
     init_engine(echo=settings.SQL_ECHO)
     await init_redis(app)
     try:
         yield
     finally:
+        shutdown_state.begin_draining("lifespan_shutdown")
+        await shutdown_state.wait_for_active_requests(settings.API_GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS)
         await close_redis(app)
         await dispose_engine()
 
@@ -27,6 +31,7 @@ def add_debug_routes(app: FastAPI) -> None:
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Pet 1", lifespan=lifespan)
+    install_graceful_shutdown(app, retry_after_seconds=settings.API_SHUTDOWN_RETRY_AFTER_SECONDS)
     for r in routers.__all__:
         app.include_router(r)
 
@@ -73,7 +78,8 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "main:app",
+        app,
         host="0.0.0.0",
         port=4000,
+        timeout_graceful_shutdown=settings.API_GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS,
     )

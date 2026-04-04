@@ -59,3 +59,22 @@ def test_ping_task_executes_in_eager(monkeypatch, eager):
     task = celery.tasks["app.celery_app.tasks.ping"]
     result = task.apply_async()
     assert result.get(timeout=3) == "pong"
+
+
+def test_create_celery_app_sets_graceful_shutdown_conf(monkeypatch):
+    monkeypatch.setenv("CELERY_BROKER_URL", "memory://")
+    monkeypatch.setenv("CELERY_RESULT_BACKEND", "rpc://")
+
+    import app.config as config_module
+
+    importlib.reload(config_module)
+    from app.celery_app import app as celery_app_module
+    importlib.reload(celery_app_module)
+    from app.celery_app.app import create_celery_app
+
+    celery = create_celery_app()
+
+    assert celery.conf.worker_prefetch_multiplier == 1
+    assert celery.conf.task_acks_late is True
+    assert celery.conf.task_acks_on_failure_or_timeout is True
+    assert celery.conf.task_reject_on_worker_lost is True

@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -53,6 +54,19 @@ class Settings(BaseSettings):
     BOOKING_EXPIRE_SECONDS: int = 20
     LOCATION_CACHE_TTL_SECONDS: int = 6
     TIMESLOT_CACHE_TTL_SECONDS: int = 30
+    API_GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS: int = 25
+    API_SHUTDOWN_RETRY_AFTER_SECONDS: int = 15
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def normalize_debug_flag(cls, value):
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"release", "prod", "production"}:
+                return False
+            if normalized in {"debug", "dev", "development"}:
+                return True
+        return value
 
     model_config = SettingsConfigDict(
         env_file=(

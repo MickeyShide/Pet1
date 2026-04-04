@@ -36,8 +36,17 @@ def create_celery_app() -> Celery:
         backend=build_result_backend_url(),
         include=["app.celery_app.tasks"],
     )
-    celery.conf.task_default_queue = "default"
-    celery.conf.task_routes = {"app.celery_app.tasks.*": {"queue": "default"}}
+    celery.conf.update(
+        task_default_queue="default",
+        task_routes={
+            "app.celery_app.tasks.*": {"queue": "default"},
+            "app.bookings.*": {"queue": "default"},
+        },
+        worker_prefetch_multiplier=1, # длина очереди у воркера типа, чтобы больше одной не брал
+        task_acks_late=True, # подтверждение выполнения ПОСЛЕ выполнения а не когда задачу взял
+        task_acks_on_failure_or_timeout=True, # подтверждение при ошибках
+        task_reject_on_worker_lost=True, # если воркер умер задача возвращается
+    )
     return celery
 
 

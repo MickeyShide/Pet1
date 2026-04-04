@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from app.db import base as db_base
@@ -42,3 +44,56 @@ async def test_new_session_without_engine_raises(monkeypatch):
 
     with pytest.raises(RuntimeError):
         await service.do()
+
+
+@pytest.mark.asyncio
+async def test_get_session_rolls_back_on_cancelled_error(monkeypatch):
+    class DummySession:
+        def __init__(self):
+            self.started = False
+            self.committed = False
+            self.rolled_back = False
+            self._in_transaction = False
+
+        async def begin(self):
+            self.started = True
+            self._in_transaction = True
+
+        async def commit(self):
+            self.committed = True
+            self._in_transaction = False
+
+        async def rollback(self):
+            self.rolled_back = True
+            self._in_transaction = False
+
+        def in_transaction(self):
+            return self._in_transaction
+
+    class DummySessionContext:
+        def __init__(self, session):
+            self.session = session
+
+        async def __aenter__(self):
+            return self.session
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    class DummySessionMaker:
+        def __init__(self, session):
+            self.session = session
+
+        def __call__(self):
+            return DummySessionContext(self.session)
+
+    session = DummySession()
+    monkeypatch.setattr(db_base, "async_session_maker", DummySessionMaker(session))
+
+    with pytest.raises(asyncio.CancelledError):
+        async with db_base.get_session():
+            raise asyncio.CancelledError
+
+    assert session.started is True
+    assert session.rolled_back is True
+    assert session.committed is False
