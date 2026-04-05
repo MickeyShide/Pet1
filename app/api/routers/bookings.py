@@ -1,23 +1,23 @@
-from typing import List
+from typing import Annotated, List
+from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Header
 from starlette import status
 
 from app.api import docs
 from app.api.deps import BookingFiltersDepends, TimeSlotFiltersDepends, UserDepends
 from app.schemas.booking import (
     SBookingCreate,
+    SBookingCreateFlexible,
     SBookingOutAfterCreate,
     SBookingOutWithTimeslots,
-    SBookingFilters,
-    SBookingCreateFlexible,
 )
 from app.schemas.payment import SPaymentOut
-from app.schemas.timeslot import STimeSlotFilters
 from app.services.business.bookings import BookingsBusinessService
 from app.services.business.payments import PaymentBusinessService
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
+IdempotencyKeyHeader = Annotated[UUID | None, Header(alias="Idempotency-Key")]
 
 
 @router.post(
@@ -68,6 +68,14 @@ router = APIRouter(prefix="/bookings", tags=["Bookings"])
                     "Timeslot is cancelled",
                     {"detail": "Timeslot is cancelled"},
                 ),
+                "idempotency_payload_conflict": docs.example(
+                    "Idempotency payload mismatch",
+                    {"detail": "Idempotency key is already used with another payload"},
+                ),
+                "idempotency_in_progress": docs.example(
+                    "Idempotency in progress",
+                    {"detail": "Booking request with this idempotency key is still in progress"},
+                ),
             },
         ),
         status.HTTP_422_UNPROCESSABLE_ENTITY: docs.error_response(
@@ -83,9 +91,13 @@ router = APIRouter(prefix="/bookings", tags=["Bookings"])
 )
 async def create_booking_route(
         booking_data: SBookingCreate,
-        token_data: UserDepends
+        token_data: UserDepends,
+        idempotency_key: IdempotencyKeyHeader = None,
 ) -> SBookingOutAfterCreate:
-    return await BookingsBusinessService(token_data=token_data).create_booking(booking_data)
+    return await BookingsBusinessService(token_data=token_data).create_booking(
+        booking_data,
+        idempotency_key=idempotency_key,
+    )
 
 
 @router.post(
@@ -152,6 +164,14 @@ async def create_booking_route(
                     "Timeslot is cancelled",
                     {"detail": "Timeslot is cancelled"},
                 ),
+                "idempotency_payload_conflict": docs.example(
+                    "Idempotency payload mismatch",
+                    {"detail": "Idempotency key is already used with another payload"},
+                ),
+                "idempotency_in_progress": docs.example(
+                    "Idempotency in progress",
+                    {"detail": "Booking request with this idempotency key is still in progress"},
+                ),
             },
         ),
         status.HTTP_422_UNPROCESSABLE_ENTITY: docs.error_response(
@@ -167,9 +187,13 @@ async def create_booking_route(
 )
 async def create_booking_flexible_route(
         booking_data: SBookingCreateFlexible,
-        token_data: UserDepends
+        token_data: UserDepends,
+        idempotency_key: IdempotencyKeyHeader = None,
 ) -> SBookingOutWithTimeslots:
-    return await BookingsBusinessService(token_data=token_data).create_booking_flexible(booking_data)
+    return await BookingsBusinessService(token_data=token_data).create_booking_flexible(
+        booking_data,
+        idempotency_key=idempotency_key,
+    )
 
 
 @router.get(
