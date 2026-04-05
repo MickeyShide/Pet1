@@ -29,3 +29,13 @@ class TimeSlotCancelled(ConflictException):
 class BookingNotPayable(ConflictException):
     def __init__(self, detail: str = "Booking cannot be paid"):
         super().__init__(detail)
+
+
+class BookingIdempotencyKeyConflict(ConflictException):
+    def __init__(self):
+        super().__init__("Idempotency key is already used with another payload")
+
+
+class BookingIdempotencyInProgress(ConflictException):
+    def __init__(self):
+        super().__init__("Booking request with this idempotency key is still in progress")
