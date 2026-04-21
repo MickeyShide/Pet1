@@ -5,6 +5,9 @@ from urllib.parse import quote
 from celery import Celery
 
 from app.config import settings
+from app.observability.logging import setup_logging
+
+setup_logging(service_name=settings.SERVICE_NAME)
 
 
 def build_broker_url() -> str:

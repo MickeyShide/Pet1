@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import json
+import logging
 from datetime import datetime, timedelta, UTC
 from decimal import Decimal
 from typing import Any, Awaitable, Callable, List, Tuple, TypeVar
@@ -28,6 +29,15 @@ from app.services.booking import BookingService
 from app.services.business.base import BaseBusinessService
 from app.services.room import RoomService
 from app.services.timeslot import TimeSlotService
+from app.observability.metrics import (
+    dec_business_operation_in_progress,
+    inc_business_operation_in_progress,
+    observe_booking_cancel,
+    observe_booking_conflict,
+    observe_booking_create,
+    observe_idempotency_conflict,
+    observe_idempotency_reuse,
+)
 from app.utils.cache import CacheService
 from app.utils.err.booking import (
     BookingIdempotencyInProgress,
@@ -39,6 +49,7 @@ from app.utils.redis import get_redis
 
 
 TBookingResult = TypeVar("TBookingResult", bound=BaseSchema)
+logger = logging.getLogger("app.business.bookings")
 
 
 class BookingsBusinessService(BaseBusinessService):
@@ -185,16 +196,50 @@ class BookingsBusinessService(BaseBusinessService):
                     continue
 
                 if state.get("fingerprint") != fingerprint:
+                    # Key mismatch.
+                    observe_idempotency_conflict(source="service", operation=operation, reason="payload_mismatch")
+                    logger.info(
+                        "idempotency_conflict",
+                        extra={
+                            "event": "idempotency_conflict",
+                            "operation": operation,
+                            "idempotency_key": str(idempotency_key),
+                            "error_code": "idempotency_payload_mismatch",
+                        },
+                    )
                     raise BookingIdempotencyKeyConflict()
 
                 if state.get("status") == "completed":
                     response_payload = state.get("response")
                     if isinstance(response_payload, dict):
+                        # Cache hit.
+                        observe_idempotency_reuse(source="service", operation=operation)
+                        logger.info(
+                            "idempotency_reused",
+                            extra={
+                                "event": "idempotency_reused",
+                                "operation": operation,
+                                "idempotency_key": str(idempotency_key),
+                                "booking_id": response_payload.get("id"),
+                                "timeslot_id": response_payload.get("timeslot_id"),
+                            },
+                        )
                         return result_model.model_validate(response_payload)
                     break
 
                 await asyncio.sleep(poll_interval)
 
+            # Still running.
+            observe_idempotency_conflict(source="service", operation=operation, reason="in_progress")
+            logger.info(
+                "idempotency_conflict",
+                extra={
+                    "event": "idempotency_conflict",
+                    "operation": operation,
+                    "idempotency_key": str(idempotency_key),
+                    "error_code": "idempotency_in_progress",
+                },
+            )
             raise BookingIdempotencyInProgress()
 
         try:
@@ -214,72 +259,160 @@ class BookingsBusinessService(BaseBusinessService):
         return result
 
     async def _create_booking_impl(self, booking_data: SBookingCreate) -> SBookingOutAfterCreate:
-        timeslot: TimeSlot = await self.timeslot_service.lock_time_slot_for_booking(booking_data.timeslot_id)
-
+        # In-flight op.
+        inc_business_operation_in_progress("booking_create")
         try:
-            new_booking: Booking = await self.booking_service.create(
-                user_id=self.user_id,
-                room_id=timeslot.room_id,
-                timeslot_id=timeslot.id,
-                total_price=timeslot.base_price,
-                expires_at=datetime.now(UTC) + timedelta(seconds=settings.BOOKING_EXPIRE_SECONDS),
+            try:
+                timeslot: TimeSlot = await self.timeslot_service.lock_time_slot_for_booking(booking_data.timeslot_id)
+            except SlotAlreadyTaken:
+                # Slot clash.
+                observe_booking_create(result="conflict", source="service", operation="create")
+                observe_booking_conflict(source="service", operation="create", reason="slot_taken")
+                logger.info(
+                    "booking_conflict",
+                    extra={
+                        "event": "booking_conflict",
+                        "timeslot_id": booking_data.timeslot_id,
+                        "error_code": "slot_already_taken",
+                    },
+                )
+                raise
+
+            try:
+                new_booking: Booking = await self.booking_service.create(
+                    user_id=self.user_id,
+                    room_id=timeslot.room_id,
+                    timeslot_id=timeslot.id,
+                    total_price=timeslot.base_price,
+                    expires_at=datetime.now(UTC) + timedelta(seconds=settings.BOOKING_EXPIRE_SECONDS),
+                )
+            except IntegrityError:
+                observe_booking_create(result="conflict", source="service", operation="create")
+                observe_booking_conflict(source="service", operation="create", reason="slot_taken")
+                logger.info(
+                    "booking_conflict",
+                    extra={
+                        "event": "booking_conflict",
+                        "timeslot_id": booking_data.timeslot_id,
+                        "error_code": "slot_already_taken",
+                    },
+                )
+                raise SlotAlreadyTaken()
+
+            await CeleryManager.expire_booking(booking=new_booking)
+            await CacheService().invalidate_timeslots_by_room_id(room_id=timeslot.room_id)
+
+            # Success path.
+            observe_booking_create(result="success", source="service", operation="create")
+            logger.info(
+                "booking_created",
+                extra={
+                    "event": "booking_created",
+                    "booking_id": new_booking.id,
+                    "timeslot_id": new_booking.timeslot_id,
+                },
             )
-        except IntegrityError:
-            raise SlotAlreadyTaken()
-
-        await CeleryManager.expire_booking(booking=new_booking)
-
-        await CacheService().invalidate_timeslots_by_room_id(room_id=timeslot.room_id)
-
-        return SBookingOutAfterCreate.from_model(new_booking)
+            return SBookingOutAfterCreate.from_model(new_booking)
+        finally:
+            dec_business_operation_in_progress("booking_create")
 
     async def _create_booking_flexible_impl(self, booking_data: SBookingCreateFlexible) -> SBookingOutWithTimeslots:
-        room = await self.room_service.get_one_by_id(booking_data.room_id)
-
-        # checks: timeslot type IS flexible, timeslot datetimes is correct
-        await self.room_service.check_flexible_booking(room=room, booking_data=booking_data)
-
-        # get timeslot price
-        base_price: Decimal = await self.room_service.get_price_quote(booking_data=booking_data)
-
-        # try to create timeslot
+        # In-flight op.
+        inc_business_operation_in_progress("booking_create_flexible")
         try:
-            new_slot: TimeSlot = await self.timeslot_service.create(
-                room_id=booking_data.room_id,
-                start_datetime=booking_data.start_datetime,
-                end_datetime=booking_data.end_datetime,
-                base_price=base_price,
+            room = await self.room_service.get_one_by_id(booking_data.room_id)
+
+            # checks: timeslot type IS flexible, timeslot datetimes is correct
+            await self.room_service.check_flexible_booking(room=room, booking_data=booking_data)
+
+            # get timeslot price
+            base_price: Decimal = await self.room_service.get_price_quote(booking_data=booking_data)
+
+            # try to create timeslot
+            try:
+                new_slot: TimeSlot = await self.timeslot_service.create(
+                    room_id=booking_data.room_id,
+                    start_datetime=booking_data.start_datetime,
+                    end_datetime=booking_data.end_datetime,
+                    base_price=base_price,
+                )
+            except IntegrityError:
+                # Slot clash.
+                observe_booking_create(result="conflict", source="service", operation="create_flexible")
+                observe_booking_conflict(source="service", operation="create_flexible", reason="invalid_timeslot")
+                logger.info(
+                    "booking_conflict",
+                    extra={
+                        "event": "booking_conflict",
+                        "timeslot_id": None,
+                        "error_code": "flexible_timeslot_conflict",
+                    },
+                )
+                raise InvalidTimeSlot()
+
+            # lock the timeslot for the booking
+            try:
+                timeslot: TimeSlot = await self.timeslot_service.lock_time_slot_for_booking(new_slot.id)
+            except SlotAlreadyTaken:
+                # Slot clash.
+                observe_booking_create(result="conflict", source="service", operation="create_flexible")
+                observe_booking_conflict(source="service", operation="create_flexible", reason="slot_taken")
+                logger.info(
+                    "booking_conflict",
+                    extra={
+                        "event": "booking_conflict",
+                        "timeslot_id": new_slot.id,
+                        "error_code": "slot_already_taken",
+                    },
+                )
+                raise
+
+            # create booking
+            try:
+                new_booking: Booking = await self.booking_service.create(
+                    user_id=self.user_id,
+                    room_id=timeslot.room_id,
+                    timeslot_id=timeslot.id,
+                    total_price=timeslot.base_price,
+                    expires_at=datetime.now(UTC) + timedelta(seconds=settings.BOOKING_EXPIRE_SECONDS),
+                )
+                new_booking.room = room
+            except IntegrityError:
+                # timeslot has active booking
+                observe_booking_create(result="conflict", source="service", operation="create_flexible")
+                observe_booking_conflict(source="service", operation="create_flexible", reason="slot_taken")
+                logger.info(
+                    "booking_conflict",
+                    extra={
+                        "event": "booking_conflict",
+                        "timeslot_id": new_slot.id,
+                        "error_code": "slot_already_taken",
+                    },
+                )
+                raise SlotAlreadyTaken()
+
+            # task to expire booking and timeslot
+            await CeleryManager.expire_booking(booking=new_booking)
+
+            # invalidate timeslots cache
+            await CacheService().invalidate_timeslots_by_room_id(room_id=timeslot.room_id)
+
+            # Success path.
+            observe_booking_create(result="success", source="service", operation="create_flexible")
+            logger.info(
+                "booking_created",
+                extra={
+                    "event": "booking_created",
+                    "booking_id": new_booking.id,
+                    "timeslot_id": new_booking.timeslot_id,
+                },
             )
-        except IntegrityError:
-            raise InvalidTimeSlot()
-
-        # lock the timeslot for the booking
-        timeslot: TimeSlot = await self.timeslot_service.lock_time_slot_for_booking(new_slot.id)
-
-        # create booking
-        try:
-            new_booking: Booking = await self.booking_service.create(
-                user_id=self.user_id,
-                room_id=timeslot.room_id,
-                timeslot_id=timeslot.id,
-                total_price=timeslot.base_price,
-                expires_at=datetime.now(UTC) + timedelta(seconds=settings.BOOKING_EXPIRE_SECONDS),
+            return SBookingOutWithTimeslots(
+                booking=SBookingOut.from_model(new_booking),
+                timeslot=STimeSlotOut.from_model(timeslot),
             )
-            new_booking.room = room
-        except IntegrityError:
-            # timeslot has active booking
-            raise SlotAlreadyTaken()
-
-        # task to expire booking and timeslot
-        await CeleryManager.expire_booking(booking=new_booking)
-
-        # invalidate timeslots cache
-        await CacheService().invalidate_timeslots_by_room_id(room_id=timeslot.room_id)
-
-        return SBookingOutWithTimeslots(
-            booking=SBookingOut.from_model(new_booking),
-            timeslot=STimeSlotOut.from_model(timeslot),
-        )
+        finally:
+            dec_business_operation_in_progress("booking_create_flexible")
 
     @new_session()
     async def create_booking(
@@ -348,19 +481,37 @@ class BookingsBusinessService(BaseBusinessService):
 
     @new_session()
     async def cancel_booking(self, booking_id: int) -> bool:
-        booking: Booking = await self.booking_service.get_one_by_id(booking_id)
-        result: bool = await self.booking_service.cancel_booking(
-            booking_id=booking_id,
-            user_id=self.user_id,
-            is_admin=self.admin,
-        )
-        if result:
-            room: Room = await self.room_service.get_one_by_id(booking.room_id)
-            if room.time_slot_type == TimeSlotType.FLEXIBLE:
-                await self.timeslot_service.update_by_id(
-                    booking.timeslot_id,
-                    status=TimeSlotStatus.CANCELED,
+        # In-flight op.
+        inc_business_operation_in_progress("booking_cancel")
+        try:
+            booking: Booking = await self.booking_service.get_one_by_id(booking_id)
+            result: bool = await self.booking_service.cancel_booking(
+                booking_id=booking_id,
+                user_id=self.user_id,
+                is_admin=self.admin,
+            )
+            if result:
+                room: Room = await self.room_service.get_one_by_id(booking.room_id)
+                if room.time_slot_type == TimeSlotType.FLEXIBLE:
+                    await self.timeslot_service.update_by_id(
+                        booking.timeslot_id,
+                        status=TimeSlotStatus.CANCELED,
+                    )
+                # invalidate timeslots cache
+                await CacheService().invalidate_timeslots_by_room_id(room_id=room.id)
+
+                observe_booking_cancel(result="success", source="service", operation="cancel")
+                logger.info(
+                    "booking_canceled",
+                    extra={
+                        "event": "booking_canceled",
+                        "booking_id": booking_id,
+                        "timeslot_id": booking.timeslot_id,
+                    },
                 )
-            # invalidate timeslots cache
-            await CacheService().invalidate_timeslots_by_room_id(room_id=room.id)
-        return result
+            else:
+                # Cancel failed.
+                observe_booking_cancel(result="failed", source="service", operation="cancel")
+            return result
+        finally:
+            dec_business_operation_in_progress("booking_cancel")

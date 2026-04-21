@@ -1,5 +1,6 @@
 # app/api/deps.py
 from datetime import datetime
+import logging
 from typing import Annotated
 
 from fastapi import Depends, Query
@@ -10,6 +11,7 @@ from pydantic import ValidationError
 
 from app.config import settings
 from app.schemas.auth import SAccessToken
+from app.observability.context import set_user_id
 from app.models.booking import BookingStatus
 from app.schemas.booking import SBookingFilters
 from app.schemas.timeslot import STimeSlotDateRange, STimeSlotFilters
@@ -18,6 +20,7 @@ from app.utils.err.base.unauthorized import UnauthorizedException
 
 _http_bearer = HTTPBearer(auto_error=False)
 HTTPBearerDepends = Annotated[HTTPAuthorizationCredentials | None, Depends(_http_bearer)]
+logger = logging.getLogger("app.api.deps")
 
 
 async def get_token_data(jwt_token: HTTPBearerDepends) -> SAccessToken:
@@ -33,9 +36,19 @@ async def get_token_data(jwt_token: HTTPBearerDepends) -> SAccessToken:
         raise UnauthorizedException("Invalid access token")
 
     try:
-        return SAccessToken(**payload)
-    except (TypeError, ValueError) as e:
-        print(e)
+        token_data = SAccessToken(**payload)
+        # ctx
+        set_user_id(token_data.sub)
+        return token_data
+    except (TypeError, ValueError) as exc:
+        logger.warning(
+            "access_token_payload_invalid",
+            extra={
+                "event": "access_token_payload_invalid",
+                "error_code": "invalid_access_token_subject",
+                "exception_type": type(exc).__name__,
+            },
+        )
         raise UnauthorizedException("Invalid access token subject")
 
 

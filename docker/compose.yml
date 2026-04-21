@@ -98,6 +98,10 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
       COOKIE_SECURE: ${COOKIE_SECURE:-1}
+      APP_ENV: ${APP_ENV:-local}
+      SERVICE_NAME: ${SERVICE_NAME:-pet1-api}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FILE_PATH: ${LOG_FILE_PATH:-/var/log/app/backend.log}
 
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
@@ -133,6 +137,7 @@ services:
         condition: service_healthy
     volumes:
       - ../:/var/www
+      - backend-logs-local:/var/log/app
     command: ["app.main:app", "--host", "0.0.0.0", "--port", "4000", "--reload", "--timeout-graceful-shutdown", "25"]
     stop_signal: SIGTERM
     stop_grace_period: 30s
@@ -178,6 +183,10 @@ services:
       S3_PUBLIC_BUCKET: ${S3_PUBLIC_BUCKET:-uploads}
       S3_REGION: ${S3_REGION:-us-east-1}
       S3_PUBLIC_BASE_URL: ${S3_PUBLIC_BASE_URL:-https://test.backend.xn--80aqenr9bu.xn--p1ai}
+      APP_ENV: ${APP_ENV:-local}
+      SERVICE_NAME: ${WORKER_SERVICE_NAME:-pet1-worker}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FILE_PATH: ${WORKER_LOG_FILE_PATH:-/var/log/app/worker.log}
 
     depends_on:
       db:
@@ -188,8 +197,99 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+    volumes:
+      - ../:/var/www
+      - backend-logs-local:/var/log/app
     stop_signal: SIGTERM
     stop_grace_period: 45s
+    networks:
+      - local-net
+
+  loki:
+    image: grafana/loki:3.3.2
+    container_name: fastapi_pet1-loki-local
+    command: ["-config.file=/etc/loki/config.yml"]
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./observability/loki/loki-config.yml:/etc/loki/config.yml:ro
+      - loki-data-local:/loki
+    networks:
+      - local-net
+
+  promtail:
+    image: grafana/promtail:3.3.2
+    container_name: fastapi_pet1-promtail-local
+    command: ["-config.file=/etc/promtail/config.yml"]
+    depends_on:
+      loki:
+        condition: service_started
+      backend:
+        condition: service_started
+      worker:
+        condition: service_started
+    volumes:
+      - ./observability/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - backend-logs-local:/var/log/app:ro
+    networks:
+      - local-net
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    container_name: fastapi_pet1-alertmanager-local
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data-local:/alertmanager
+    networks:
+      - local-net
+
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    container_name: fastapi_pet1-prometheus-local
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    ports:
+      - "9090:9090"
+    depends_on:
+      backend:
+        condition: service_started
+      alertmanager:
+        condition: service_started
+      loki:
+        condition: service_started
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
+      - prometheus-data-local:/prometheus
+    networks:
+      - local-net
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    container_name: fastapi_pet1-grafana-local
+    ports:
+      - "3000:3000"
+    depends_on:
+      prometheus:
+        condition: service_started
+      loki:
+        condition: service_started
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_METRICS_ENABLED: "true"
+    volumes:
+      - grafana-data-local:/var/lib/grafana
+      - ./observability/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./observability/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
       - local-net
 
@@ -201,3 +301,8 @@ volumes:
   redis-data-local:
   rabbitmq-data-local:
   minio-data-local:
+  backend-logs-local:
+  prometheus-data-local:
+  loki-data-local:
+  grafana-data-local:
+  alertmanager-data-local:

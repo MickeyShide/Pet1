@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from decimal import Decimal
+import logging
 from typing import Callable, Awaitable, TypeVar
 
 from app.db.base import new_session
@@ -17,6 +18,11 @@ from app.schemas.payment import SPaymentCreate, SPaymentOut
 from app.services.booking import BookingService
 from app.services.business.base import BaseBusinessService
 from app.services.payment import PaymentService
+from app.observability.metrics import (
+    dec_business_operation_in_progress,
+    inc_business_operation_in_progress,
+    observe_booking_payment_confirm,
+)
 from app.utils.err.base.not_found import NotFoundException
 from app.utils.err.booking import BookingNotFound, BookingNotPayable
 from app.utils.err.payment import (
@@ -28,6 +34,7 @@ from app.utils.err.payment import (
 
 
 RT = TypeVar("RT")
+logger = logging.getLogger("app.business.payments")
 
 
 class PaymentBusinessService(BaseBusinessService):
@@ -97,35 +104,57 @@ class PaymentBusinessService(BaseBusinessService):
 
     @new_session()
     async def confirm_payment(self, payment_id: int) -> SPaymentOut:
+        # In-flight op.
+        inc_business_operation_in_progress("confirm_payment")
         try:
-            payment: Payment = await self.payment_service.get_one_by_id(payment_id)
-            booking: Booking = await self.booking_service.get_one_by_id(payment.booking_id)
-            if not self.admin and booking.user_id != self.user_id:
+            try:
+                payment: Payment = await self.payment_service.get_one_by_id(payment_id)
+                booking: Booking = await self.booking_service.get_one_by_id(payment.booking_id)
+                if not self.admin and booking.user_id != self.user_id:
+                    # Hide foreign payment.
+                    raise PaymentNotFound()
+            except NotFoundException:
+                observe_booking_payment_confirm(result="failed", source="service", operation="confirm_payment")
                 raise PaymentNotFound()
-        except NotFoundException:
-            raise PaymentNotFound()
 
-        if booking.status == BookingStatus.PAID:
-            if payment.status == PaymentStatus.SUCCESS:
-                return SPaymentOut.from_model(payment)
-            raise BookingNotPayable("Booking already paid")
+            if booking.status == BookingStatus.PAID:
+                if payment.status == PaymentStatus.SUCCESS:
+                    # Idempotent success.
+                    observe_booking_payment_confirm(result="success", source="service", operation="confirm_payment")
+                    return SPaymentOut.from_model(payment)
+                observe_booking_payment_confirm(result="conflict", source="service", operation="confirm_payment")
+                raise BookingNotPayable("Booking already paid")
 
-        if booking.status != BookingStatus.PENDING_PAYMENTS:
-            raise BookingNotPayable(f"Booking status is {booking.status.value}")
+            if booking.status != BookingStatus.PENDING_PAYMENTS:
+                observe_booking_payment_confirm(result="conflict", source="service", operation="confirm_payment")
+                raise BookingNotPayable(f"Booking status is {booking.status.value}")
 
-        if booking.expires_at <= datetime.now(timezone.utc):
-            raise BookingNotPayable("Booking expired")
-        payment_gateway = self._get_payment_gateway()
+            if booking.expires_at <= datetime.now(timezone.utc):
+                observe_booking_payment_confirm(result="conflict", source="service", operation="confirm_payment")
+                raise BookingNotPayable("Booking expired")
+            payment_gateway = self._get_payment_gateway()
 
-        await self._call_gateway_with_retry(
-            operation_name="confirm_payment",
-            operation=lambda: payment_gateway.confirm_payment(
-                external_id=payment.external_id,
-                amount=Decimal(booking.total_price),
-            ),
-        )
+            await self._call_gateway_with_retry(
+                operation_name="confirm_payment",
+                operation=lambda: payment_gateway.confirm_payment(
+                    external_id=payment.external_id,
+                    amount=Decimal(booking.total_price),
+                ),
+            )
 
-        updated_payment: Payment = await self.payment_service.update_by_id(payment_id, status=PaymentStatus.SUCCESS)
-        await self.booking_service.set_booking_paid(updated_payment.booking_id)
+            updated_payment: Payment = await self.payment_service.update_by_id(payment_id, status=PaymentStatus.SUCCESS)
+            await self.booking_service.set_booking_paid(updated_payment.booking_id)
 
-        return SPaymentOut.from_model(updated_payment)
+            # Success path.
+            observe_booking_payment_confirm(result="success", source="service", operation="confirm_payment")
+            logger.info(
+                "payment_confirmed",
+                extra={
+                    "event": "payment_confirmed",
+                    "booking_id": updated_payment.booking_id,
+                    "payment_id": updated_payment.id,
+                },
+            )
+            return SPaymentOut.from_model(updated_payment)
+        finally:
+            dec_business_operation_in_progress("confirm_payment")

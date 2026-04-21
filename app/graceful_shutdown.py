@@ -12,7 +12,8 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 STATE_KEY = "graceful_shutdown_state"
 MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
-UNTRACKED_PATHS = frozenset({"/health", "/ready"})
+# Ignore probe paths.
+UNTRACKED_PATHS = frozenset({"/health", "/ready", "/metrics"})
 
 
 class GracefulShutdownState:
