@@ -7,6 +7,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     DEBUG: bool = False
     APP_ENV: str = "local"
+    # Observability.
+    SERVICE_NAME: str = "pet1-api"
+    LOG_LEVEL: str = "INFO"
+    LOG_FILE_PATH: str = ""
 
     # Database
     DATABASE_URL: str  # postgresql+asyncpg://user:pass@host:port/db

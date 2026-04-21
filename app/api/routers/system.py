@@ -10,6 +10,7 @@ from starlette.responses import JSONResponse
 from app.celery_app.app import build_broker_url
 from app.db import base as db_base
 from app.graceful_shutdown import get_graceful_shutdown_state
+from app.observability.metrics import metrics_response
 from app.utils.redis import get_redis
 
 router = APIRouter(tags=["System"])
@@ -77,3 +78,7 @@ async def ready(request: Request):
     if db_ok and redis_ok and rabbitmq_ok and not is_draining:
         return payload
     return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content=payload)
+
+@router.get("/metrics", include_in_schema=False)
+async def metrics():
+    return metrics_response()

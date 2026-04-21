@@ -1,0 +1,66 @@
+groups:
+  - name: pet1-degradation
+    rules:
+      # Lab values for demo/staging thresholds.
+      - alert: AppDown
+        expr: up{job="pet1-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend is down"
+          description: "pet1 backend target has not been scraped for 1 minute."
+
+      - alert: HighHttpErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_errors_total{job="pet1-backend"}[5m]))
+            /
+            clamp_min(sum(rate(http_requests_total{job="pet1-backend"}[5m])), 1)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP error rate"
+          description: "HTTP error rate is above 5% in the last 5 minutes."
+
+      - alert: HighHttpLatencyP95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(http_request_duration_seconds_bucket{job="pet1-backend"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency p95"
+          description: "p95 latency is above 1 second in the last 5 minutes."
+
+      - alert: TooManyInProgressRequests
+        expr: max(http_requests_in_progress{job="pet1-backend"}) > 20
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Too many in-progress requests"
+          description: "In-progress requests are above 20 for 3 minutes."
+
+      - alert: BookingConflictsSpike
+        expr: sum(rate(booking_conflicts_total{job="pet1-backend"}[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Booking conflicts spike"
+          description: "Booking conflicts rate is above 0.5/s in the last 5 minutes."
+
+      - alert: ObservabilityComponentDown
+        expr: up{job=~"prometheus|loki|grafana|alertmanager"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Observability component down"
+          description: "One of Prometheus/Loki/Grafana/Alertmanager targets is down."

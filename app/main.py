@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,21 +9,29 @@ from app.api import routers
 from app.config import settings
 from app.db.base import init_engine, dispose_engine
 from app.graceful_shutdown import get_graceful_shutdown_state, install_graceful_shutdown
+from app.observability import RequestObservabilityMiddleware, setup_logging
 from app.utils.redis import init_redis, close_redis
+
+setup_logging()
+logger = logging.getLogger("app.main")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     shutdown_state = get_graceful_shutdown_state(app)
+    logger.info("application_startup_begin", extra={"event": "application_startup_begin"})
     init_engine(echo=settings.SQL_ECHO)
     await init_redis(app)
+    logger.info("application_startup_ready", extra={"event": "application_startup_ready"})
     try:
         yield
     finally:
+        logger.info("application_shutdown_begin", extra={"event": "application_shutdown_begin"})
         shutdown_state.begin_draining("lifespan_shutdown")
         await shutdown_state.wait_for_active_requests(settings.API_GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS)
         await close_redis(app)
         await dispose_engine()
+        logger.info("application_shutdown_complete", extra={"event": "application_shutdown_complete"})
 
 
 def add_debug_routes(app: FastAPI) -> None:
@@ -43,6 +52,8 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    
+    app.add_middleware(RequestObservabilityMiddleware)
 
     if settings.DEBUG:
         add_debug_routes(app)
