@@ -1,5 +1,6 @@
 /app/.env
 /.env
+/docker/telegram.env
 /.venv/
 /.idea/
 .idea/.gitignore

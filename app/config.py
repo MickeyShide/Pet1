@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     SERVICE_NAME: str = "pet1-api"
     LOG_LEVEL: str = "INFO"
     LOG_FILE_PATH: str = ""
+    TELEGRAM_LOG_ENABLED: bool = False
+    TELEGRAM_LOG_BOT_TOKEN: str = ""
+    TELEGRAM_LOG_CHAT_ID: str = ""
+    TELEGRAM_LOG_LEVEL: str = "ERROR"
+    TELEGRAM_LOG_TIMEOUT_SECONDS: float = 5.0
 
     # Database
     DATABASE_URL: str  # postgresql+asyncpg://user:pass@host:port/db
@@ -59,7 +64,7 @@ class Settings(BaseSettings):
     LOCATION_CACHE_TTL_SECONDS: int = 6
     TIMESLOT_CACHE_TTL_SECONDS: int = 30
     API_GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS: int = 25
-    API_SHUTDOWN_RETRY_AFTER_SECONDS: int = 15
+    API_SHUTDOWN_RETRY_AFTER_SECONDS: int = 5
     BOOKING_IDEMPOTENCY_TTL_SECONDS: int = 600
     BOOKING_IDEMPOTENCY_WAIT_SECONDS: float = 2.0
     BOOKING_IDEMPOTENCY_POLL_SECONDS: float = 0.05

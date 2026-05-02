@@ -91,6 +91,8 @@ services:
       context: ../
       dockerfile: docker/Dockerfile
     container_name: fastapi_pet1-backend-local
+    env_file:
+      - ./telegram.env
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://app:app@db/fastapi_pet_1}
       SECRET_KEY: ${SECRET_KEY:-abcdefg}
@@ -149,6 +151,8 @@ services:
       context: ../
       dockerfile: docker/Dockerfile
     container_name: fastapi_pet1-worker-local
+    env_file:
+      - ./telegram.env
     entrypoint:
       - python
       - -m

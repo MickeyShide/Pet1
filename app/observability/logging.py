@@ -4,6 +4,9 @@ import json
 import logging
 import os
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import datetime, timezone
 from typing import Any
 
@@ -94,6 +97,58 @@ class JsonLogFormatter(logging.Formatter):
         return json.dumps(payload, ensure_ascii=False, default=str)
 
 
+class TelegramLogHandler(logging.Handler):
+    def __init__(
+        self,
+        *,
+        bot_token: str,
+        chat_id: str,
+        service_name: str,
+        environment: str,
+        timeout_seconds: float,
+    ) -> None:
+        super().__init__()
+        self.bot_token = bot_token
+        self.chat_id = chat_id
+        self.service_name = service_name
+        self.environment = environment
+        self.timeout_seconds = timeout_seconds
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            text = self._build_message(record)
+            self._send_message(text)
+        except Exception:
+            self.handleError(record)
+
+    def _build_message(self, record: logging.LogRecord) -> str:
+        payload = self.format(record)
+        header = (
+            f"[{record.levelname}] "
+            f"{self.service_name} "
+            f"{self.environment} "
+            f"{record.name}: {record.getMessage()}"
+        )
+        text = f"{header}\n\n{payload}"
+        return text[:3900]
+
+    def _send_message(self, text: str) -> None:
+        url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+        data = urllib.parse.urlencode(
+            {
+                "chat_id": self.chat_id,
+                "text": text,
+                "disable_web_page_preview": "true",
+            }
+        ).encode("utf-8")
+        request = urllib.request.Request(url, data=data, method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout_seconds):
+                return
+        except (urllib.error.URLError, TimeoutError, OSError):
+            return
+
+
 def _build_stream_handler(service_name: str, environment: str) -> logging.Handler:
     # Stdout logs.
     handler = logging.StreamHandler(sys.stdout)
@@ -108,6 +163,20 @@ def _build_file_handler(service_name: str, environment: str, file_path: str) -> 
     if directory:
         os.makedirs(directory, exist_ok=True)
     handler = logging.FileHandler(file_path, encoding="utf-8")
+    handler.setFormatter(JsonLogFormatter(service_name=service_name, environment=environment))
+    handler.addFilter(RequestContextFilter())
+    return handler
+
+
+def _build_telegram_handler(service_name: str, environment: str) -> logging.Handler:
+    handler = TelegramLogHandler(
+        bot_token=settings.TELEGRAM_LOG_BOT_TOKEN,
+        chat_id=settings.TELEGRAM_LOG_CHAT_ID,
+        service_name=service_name,
+        environment=environment,
+        timeout_seconds=settings.TELEGRAM_LOG_TIMEOUT_SECONDS,
+    )
+    handler.setLevel(getattr(logging, settings.TELEGRAM_LOG_LEVEL.upper(), logging.ERROR))
     handler.setFormatter(JsonLogFormatter(service_name=service_name, environment=environment))
     handler.addFilter(RequestContextFilter())
     return handler
@@ -140,6 +209,18 @@ def setup_logging(*, service_name: str | None = None) -> None:
                 service_name=resolved_service_name,
                 environment=settings.APP_ENV,
                 file_path=log_file_path,
+            )
+        )
+
+    if (
+        settings.TELEGRAM_LOG_ENABLED
+        and settings.TELEGRAM_LOG_BOT_TOKEN.strip()
+        and settings.TELEGRAM_LOG_CHAT_ID.strip()
+    ):
+        root_logger.addHandler(
+            _build_telegram_handler(
+                service_name=resolved_service_name,
+                environment=settings.APP_ENV,
             )
         )
 
