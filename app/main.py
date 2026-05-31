@@ -10,6 +10,7 @@ from app.config import settings
 from app.db.base import init_engine, dispose_engine
 from app.graceful_shutdown import get_graceful_shutdown_state, install_graceful_shutdown
 from app.observability import RequestObservabilityMiddleware, setup_logging
+from app.observability.metrics import observe_readiness_state
 from app.utils.redis import init_redis, close_redis
 
 setup_logging()
@@ -19,15 +20,18 @@ logger = logging.getLogger("app.main")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     shutdown_state = get_graceful_shutdown_state(app)
+    observe_readiness_state(is_ready=False, is_draining=False)
     logger.info("application_startup_begin", extra={"event": "application_startup_begin"})
     init_engine(echo=settings.SQL_ECHO)
     await init_redis(app)
+    observe_readiness_state(is_ready=True, is_draining=False)
     logger.info("application_startup_ready", extra={"event": "application_startup_ready"})
     try:
         yield
     finally:
         logger.info("application_shutdown_begin", extra={"event": "application_shutdown_begin"})
         shutdown_state.begin_draining("lifespan_shutdown")
+        observe_readiness_state(is_ready=False, is_draining=True)
         await shutdown_state.wait_for_active_requests(settings.API_GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS)
         await close_redis(app)
         await dispose_engine()

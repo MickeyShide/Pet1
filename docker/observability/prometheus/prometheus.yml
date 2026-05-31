@@ -23,6 +23,11 @@ scrape_configs:
       - targets:
           - backend:4000
 
+  - job_name: pet1-worker
+    static_configs:
+      - targets:
+          - worker:9101
+
   - job_name: loki
     static_configs:
       - targets:

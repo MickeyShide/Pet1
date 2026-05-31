@@ -3,11 +3,21 @@ from __future__ import annotations
 from urllib.parse import quote
 
 from celery import Celery
+from prometheus_client import start_http_server
 
 from app.config import settings
 from app.observability.logging import setup_logging
 
-setup_logging(service_name=settings.SERVICE_NAME)
+setup_logging(service_name=f"{settings.SERVICE_NAME}-worker")
+_METRICS_SERVER_STARTED = False
+
+
+def start_worker_metrics_server() -> None:
+    global _METRICS_SERVER_STARTED
+    if _METRICS_SERVER_STARTED:
+        return
+    start_http_server(addr=settings.CELERY_METRICS_HOST, port=settings.CELERY_METRICS_PORT)
+    _METRICS_SERVER_STARTED = True
 
 
 def build_broker_url() -> str:
@@ -54,6 +64,7 @@ def create_celery_app() -> Celery:
 
 
 celery_app = create_celery_app()
+start_worker_metrics_server()
 
 
 @celery_app.task(name="app.celery_app.tasks.ping")

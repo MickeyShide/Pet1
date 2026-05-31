@@ -9,5 +9,7 @@ async def test__metrics_endpoint_exposes_prometheus_metrics(async_client):
     assert response.status_code == 200
     assert "http_requests_total" in response.text
     assert "http_request_duration_seconds" in response.text
+    assert "business_operation_duration_seconds" in response.text
     assert "booking_conflicts_total" in response.text
     assert "idempotency_reuse_total" in response.text
+    assert "payment_gateway_operation_duration_seconds" in response.text

@@ -64,6 +64,7 @@ async def retry_with_backoff(
     base_delay_seconds: float,
     max_delay_seconds: float,
     is_retryable: Callable[[Exception], bool],
+    on_retry: Callable[[int, float, Exception], None] | None = None,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
 ) -> T:
     if max_attempts < 1:
@@ -78,5 +79,7 @@ async def retry_with_backoff(
                 raise
 
             delay = min(max_delay_seconds, base_delay_seconds * (2 ** (attempt - 1)))
+            if on_retry is not None:
+                on_retry(attempt, delay, exc)
             await sleep(max(0.0, delay))
             attempt += 1

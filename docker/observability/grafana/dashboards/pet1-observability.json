@@ -28,6 +28,302 @@
       },
       "fieldConfig": {
         "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "DOWN"
+                },
+                "1": {
+                  "text": "READY"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "expr": "max(app_readiness_status{job=\"pet1-backend\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Backend Readiness",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "DOWN"
+                },
+                "1": {
+                  "text": "UP"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "expr": "max(up{job=\"pet1-worker\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Worker Scrape",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "OFF"
+                },
+                "1": {
+                  "text": "DRAINING"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "expr": "max(app_draining_status{job=\"pet1-backend\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Draining Mode",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "expr": "max(http_requests_in_progress{job=\"pet1-backend\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "HTTP In Progress",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
+      "id": 5,
+      "options": {
+        "colWidth": 0.9,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "mergeValues": true,
+        "rowHeight": 0.9,
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "expr": "dependency_status{job=\"pet1-backend\"}",
+          "legendFormat": "{{dependency}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Dependencies State",
+      "type": "state-timeline"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
           "unit": "reqps"
         },
         "overrides": []
@@ -36,23 +332,28 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 0
+        "y": 5
       },
-      "id": 1,
+      "id": 6,
       "options": {
         "legend": {
-          "displayMode": "list",
+          "displayMode": "table",
           "placement": "bottom"
         }
       },
       "targets": [
         {
           "expr": "sum(rate(http_requests_total{job=\"pet1-backend\"}[1m]))",
-          "legendFormat": "RPS",
+          "legendFormat": "total rps",
           "refId": "A"
+        },
+        {
+          "expr": "topk(5, sum by (route) (rate(http_requests_total{job=\"pet1-backend\"}[1m])))",
+          "legendFormat": "{{route}}",
+          "refId": "B"
         }
       ],
-      "title": "HTTP RPS",
+      "title": "HTTP Throughput",
       "type": "timeseries"
     },
     {
@@ -70,17 +371,28 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 0
+        "y": 5
       },
-      "id": 2,
+      "id": 7,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"pet1-backend\"}[5m])) by (le))",
-          "legendFormat": "p95",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"pet1-backend\"}[5m])))",
+          "legendFormat": "http p50",
           "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"pet1-backend\"}[5m])))",
+          "legendFormat": "http p99",
+          "refId": "B"
         }
       ],
-      "title": "HTTP Latency p95",
+      "title": "HTTP Latency P50/P99",
       "type": "timeseries"
     },
     {
@@ -98,13 +410,19 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 0
+        "y": 5
       },
-      "id": 3,
+      "id": 8,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
       "targets": [
         {
           "expr": "100 * sum(rate(http_requests_errors_total{job=\"pet1-backend\"}[5m])) / clamp_min(sum(rate(http_requests_total{job=\"pet1-backend\"}[5m])), 1)",
-          "legendFormat": "Error rate %",
+          "legendFormat": "error rate",
           "refId": "A"
         }
       ],
@@ -118,7 +436,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "s"
         },
         "overrides": []
       },
@@ -126,31 +444,24 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 8
+        "y": 13
       },
-      "id": 4,
+      "id": 9,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
       },
       "targets": [
         {
-          "expr": "http_requests_in_progress{job=\"pet1-backend\"}",
+          "expr": "topk(5, histogram_quantile(0.99, sum by (le, route) (rate(http_request_duration_seconds_bucket{job=\"pet1-backend\"}[5m]))))",
+          "legendFormat": "{{route}}",
           "refId": "A"
         }
       ],
-      "title": "Requests In Progress",
-      "type": "stat"
+      "title": "Top HTTP Routes by P99",
+      "type": "timeseries"
     },
     {
       "datasource": {
@@ -159,7 +470,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "ops"
+          "unit": "s"
         },
         "overrides": []
       },
@@ -167,17 +478,28 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 8
+        "y": 13
       },
-      "id": 5,
+      "id": 10,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
       "targets": [
         {
-          "expr": "sum(rate(booking_conflicts_total{job=\"pet1-backend\"}[5m]))",
-          "legendFormat": "booking_conflicts/s",
+          "expr": "histogram_quantile(0.50, sum by (le, operation) (rate(business_operation_duration_seconds_bucket{job=\"pet1-backend\"}[5m])))",
+          "legendFormat": "{{operation}} p50",
           "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, operation) (rate(business_operation_duration_seconds_bucket{job=\"pet1-backend\"}[5m])))",
+          "legendFormat": "{{operation}} p99",
+          "refId": "B"
         }
       ],
-      "title": "Booking Conflicts Rate",
+      "title": "Business Operations P50/P99",
       "type": "timeseries"
     },
     {
@@ -195,22 +517,194 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 8
+        "y": 13
       },
-      "id": 6,
+      "id": 11,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
       "targets": [
         {
-          "expr": "sum(rate(idempotency_reuse_total{job=\"pet1-backend\"}[5m]))",
-          "legendFormat": "reuse/s",
+          "expr": "sum by (reason) (rate(booking_conflicts_total{job=\"pet1-backend\"}[5m]))",
+          "legendFormat": "booking conflict {{reason}}",
           "refId": "A"
         },
         {
           "expr": "sum(rate(idempotency_conflicts_total{job=\"pet1-backend\"}[5m]))",
-          "legendFormat": "conflicts/s",
+          "legendFormat": "idempotency conflicts",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(idempotency_reuse_total{job=\"pet1-backend\"}[5m]))",
+          "legendFormat": "idempotency reuse",
+          "refId": "C"
+        }
+      ],
+      "title": "Booking and Idempotency Signals",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 21
+      },
+      "id": 12,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, operation) (rate(payment_gateway_operation_duration_seconds_bucket{job=\"pet1-backend\"}[5m])))",
+          "legendFormat": "{{operation}} p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, operation) (rate(payment_gateway_operation_duration_seconds_bucket{job=\"pet1-backend\"}[5m])))",
+          "legendFormat": "{{operation}} p99",
           "refId": "B"
         }
       ],
-      "title": "Idempotency Signals",
+      "title": "Payment Gateway P50/P99",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 21
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (operation, error_type) (rate(payment_gateway_retries_total{job=\"pet1-backend\"}[5m]))",
+          "legendFormat": "{{operation}} retry {{error_type}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (operation, error_type) (rate(payment_gateway_errors_total{job=\"pet1-backend\"}[5m]))",
+          "legendFormat": "{{operation}} error {{error_type}}",
+          "refId": "B"
+        }
+      ],
+      "title": "Payment Gateway Retries and Errors",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 21
+      },
+      "id": 14,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, task) (rate(background_task_schedule_lag_seconds_bucket{job=\"pet1-worker\"}[5m])))",
+          "legendFormat": "{{task}} lag p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, task) (rate(background_task_schedule_lag_seconds_bucket{job=\"pet1-worker\"}[5m])))",
+          "legendFormat": "{{task}} lag p99",
+          "refId": "B"
+        }
+      ],
+      "title": "Background Task Schedule Lag P50/P99",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 29
+      },
+      "id": 15,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le, task) (rate(background_task_duration_seconds_bucket{job=\"pet1-worker\"}[5m])))",
+          "legendFormat": "{{task}} duration p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le, task) (rate(background_task_duration_seconds_bucket{job=\"pet1-worker\"}[5m])))",
+          "legendFormat": "{{task}} duration p99",
+          "refId": "B"
+        },
+        {
+          "expr": "sum by (task, result) (rate(background_tasks_total{job=\"pet1-worker\"}[5m]))",
+          "legendFormat": "{{task}} {{result}}",
+          "refId": "C"
+        }
+      ],
+      "title": "Background Task Runtime and Outcomes",
       "type": "timeseries"
     },
     {
@@ -219,12 +713,12 @@
         "uid": "loki"
       },
       "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 16
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 29
       },
-      "id": 7,
+      "id": 16,
       "options": {
         "dedupStrategy": "none",
         "enableLogDetails": true,
@@ -237,12 +731,12 @@
       },
       "targets": [
         {
-          "expr": "{job=~\"pet1-backend|pet1-worker\"}",
+          "expr": "{job=~\"pet1-backend|pet1-worker\"} | json | anomaly_type != \"\"",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "Application Logs (Loki)",
+      "title": "Anomaly Logs",
       "type": "logs"
     }
   ],
@@ -250,17 +744,19 @@
   "schemaVersion": 39,
   "tags": [
     "pet1",
-    "observability"
+    "observability",
+    "prometheus",
+    "grafana"
   ],
   "templating": {
     "list": []
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-6h",
     "to": "now"
   },
   "timezone": "browser",
   "title": "Pet1 Observability",
   "uid": "pet1-observability",
-  "version": 1
+  "version": 2
 }

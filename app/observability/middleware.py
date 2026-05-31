@@ -18,6 +18,7 @@ from app.observability.context import (
     set_request_id,
     set_user_id,
 )
+from app.config import settings
 from app.observability.metrics import (
     dec_http_requests_in_progress,
     get_route_label,
@@ -98,6 +99,19 @@ class RequestObservabilityMiddleware(BaseHTTPMiddleware):
                     "duration_ms": duration_ms,
                 },
             )
+            if duration_seconds >= settings.OBS_SLOW_HTTP_REQUEST_SECONDS:
+                logger.warning(
+                    "http_request_slow",
+                    extra={
+                        "event": "http_request_slow",
+                        "path": route,
+                        "method": request.method.upper(),
+                        "status_code": status_code,
+                        "duration_ms": duration_ms,
+                        "threshold_ms": round(settings.OBS_SLOW_HTTP_REQUEST_SECONDS * 1000, 3),
+                        "anomaly_type": "slow_http_request",
+                    },
+                )
 
             # Clear request ctx.
             reset_request_id(token_request_id)
