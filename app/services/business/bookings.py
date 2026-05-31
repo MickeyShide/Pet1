@@ -4,6 +4,7 @@ import json
 import logging
 from datetime import datetime, timedelta, UTC
 from decimal import Decimal
+from time import perf_counter
 from typing import Any, Awaitable, Callable, List, Tuple, TypeVar
 from uuid import UUID
 
@@ -32,12 +33,14 @@ from app.services.timeslot import TimeSlotService
 from app.observability.metrics import (
     dec_business_operation_in_progress,
     inc_business_operation_in_progress,
+    observe_business_operation_duration,
     observe_booking_cancel,
     observe_booking_conflict,
     observe_booking_create,
     observe_idempotency_conflict,
     observe_idempotency_reuse,
 )
+from app.overload import overload_protected
 from app.utils.cache import CacheService
 from app.utils.err.booking import (
     BookingIdempotencyInProgress,
@@ -260,12 +263,16 @@ class BookingsBusinessService(BaseBusinessService):
 
     async def _create_booking_impl(self, booking_data: SBookingCreate) -> SBookingOutAfterCreate:
         # In-flight op.
-        inc_business_operation_in_progress("booking_create")
+        operation = "booking_create"
+        started_at = perf_counter()
+        result_label = "error"
+        inc_business_operation_in_progress(operation)
         try:
             try:
                 timeslot: TimeSlot = await self.timeslot_service.lock_time_slot_for_booking(booking_data.timeslot_id)
             except SlotAlreadyTaken:
                 # Slot clash.
+                result_label = "conflict"
                 observe_booking_create(result="conflict", source="service", operation="create")
                 observe_booking_conflict(source="service", operation="create", reason="slot_taken")
                 logger.info(
@@ -287,6 +294,7 @@ class BookingsBusinessService(BaseBusinessService):
                     expires_at=datetime.now(UTC) + timedelta(seconds=settings.BOOKING_EXPIRE_SECONDS),
                 )
             except IntegrityError:
+                result_label = "conflict"
                 observe_booking_create(result="conflict", source="service", operation="create")
                 observe_booking_conflict(source="service", operation="create", reason="slot_taken")
                 logger.info(
@@ -303,22 +311,46 @@ class BookingsBusinessService(BaseBusinessService):
             await CacheService().invalidate_timeslots_by_room_id(room_id=timeslot.room_id)
 
             # Success path.
+            result_label = "success"
             observe_booking_create(result="success", source="service", operation="create")
             logger.info(
                 "booking_created",
                 extra={
                     "event": "booking_created",
+                    "operation": operation,
                     "booking_id": new_booking.id,
                     "timeslot_id": new_booking.timeslot_id,
                 },
             )
             return SBookingOutAfterCreate.from_model(new_booking)
         finally:
-            dec_business_operation_in_progress("booking_create")
+            duration_seconds = perf_counter() - started_at
+            observe_business_operation_duration(
+                operation=operation,
+                result=result_label,
+                duration_seconds=duration_seconds,
+            )
+            if duration_seconds >= settings.OBS_SLOW_BUSINESS_OPERATION_SECONDS:
+                logger.warning(
+                    "business_operation_slow",
+                    extra={
+                        "event": "business_operation_slow",
+                        "operation": operation,
+                        "duration_ms": round(duration_seconds * 1000, 3),
+                        "threshold_ms": round(settings.OBS_SLOW_BUSINESS_OPERATION_SECONDS * 1000, 3),
+                        "result": result_label,
+                        "timeslot_id": booking_data.timeslot_id,
+                        "anomaly_type": "slow_business_operation",
+                    },
+                )
+            dec_business_operation_in_progress(operation)
 
     async def _create_booking_flexible_impl(self, booking_data: SBookingCreateFlexible) -> SBookingOutWithTimeslots:
         # In-flight op.
-        inc_business_operation_in_progress("booking_create_flexible")
+        operation = "booking_create_flexible"
+        started_at = perf_counter()
+        result_label = "error"
+        inc_business_operation_in_progress(operation)
         try:
             room = await self.room_service.get_one_by_id(booking_data.room_id)
 
@@ -338,6 +370,7 @@ class BookingsBusinessService(BaseBusinessService):
                 )
             except IntegrityError:
                 # Slot clash.
+                result_label = "conflict"
                 observe_booking_create(result="conflict", source="service", operation="create_flexible")
                 observe_booking_conflict(source="service", operation="create_flexible", reason="invalid_timeslot")
                 logger.info(
@@ -355,6 +388,7 @@ class BookingsBusinessService(BaseBusinessService):
                 timeslot: TimeSlot = await self.timeslot_service.lock_time_slot_for_booking(new_slot.id)
             except SlotAlreadyTaken:
                 # Slot clash.
+                result_label = "conflict"
                 observe_booking_create(result="conflict", source="service", operation="create_flexible")
                 observe_booking_conflict(source="service", operation="create_flexible", reason="slot_taken")
                 logger.info(
@@ -379,6 +413,7 @@ class BookingsBusinessService(BaseBusinessService):
                 new_booking.room = room
             except IntegrityError:
                 # timeslot has active booking
+                result_label = "conflict"
                 observe_booking_create(result="conflict", source="service", operation="create_flexible")
                 observe_booking_conflict(source="service", operation="create_flexible", reason="slot_taken")
                 logger.info(
@@ -398,11 +433,13 @@ class BookingsBusinessService(BaseBusinessService):
             await CacheService().invalidate_timeslots_by_room_id(room_id=timeslot.room_id)
 
             # Success path.
+            result_label = "success"
             observe_booking_create(result="success", source="service", operation="create_flexible")
             logger.info(
                 "booking_created",
                 extra={
                     "event": "booking_created",
+                    "operation": operation,
                     "booking_id": new_booking.id,
                     "timeslot_id": new_booking.timeslot_id,
                 },
@@ -412,8 +449,28 @@ class BookingsBusinessService(BaseBusinessService):
                 timeslot=STimeSlotOut.from_model(timeslot),
             )
         finally:
-            dec_business_operation_in_progress("booking_create_flexible")
+            duration_seconds = perf_counter() - started_at
+            observe_business_operation_duration(
+                operation=operation,
+                result=result_label,
+                duration_seconds=duration_seconds,
+            )
+            if duration_seconds >= settings.OBS_SLOW_BUSINESS_OPERATION_SECONDS:
+                logger.warning(
+                    "business_operation_slow",
+                    extra={
+                        "event": "business_operation_slow",
+                        "operation": operation,
+                        "duration_ms": round(duration_seconds * 1000, 3),
+                        "threshold_ms": round(settings.OBS_SLOW_BUSINESS_OPERATION_SECONDS * 1000, 3),
+                        "result": result_label,
+                        "room_id": booking_data.room_id,
+                        "anomaly_type": "slow_business_operation",
+                    },
+                )
+            dec_business_operation_in_progress(operation)
 
+    @overload_protected("booking_create")
     @new_session()
     async def create_booking(
             self,
@@ -428,6 +485,7 @@ class BookingsBusinessService(BaseBusinessService):
             fn=lambda: self._create_booking_impl(booking_data),
         )
 
+    @overload_protected("booking_create_flexible")
     @new_session()
     async def create_booking_flexible(
             self,
@@ -482,7 +540,10 @@ class BookingsBusinessService(BaseBusinessService):
     @new_session()
     async def cancel_booking(self, booking_id: int) -> bool:
         # In-flight op.
-        inc_business_operation_in_progress("booking_cancel")
+        operation = "booking_cancel"
+        started_at = perf_counter()
+        result_label = "error"
+        inc_business_operation_in_progress(operation)
         try:
             booking: Booking = await self.booking_service.get_one_by_id(booking_id)
             result: bool = await self.booking_service.cancel_booking(
@@ -500,18 +561,40 @@ class BookingsBusinessService(BaseBusinessService):
                 # invalidate timeslots cache
                 await CacheService().invalidate_timeslots_by_room_id(room_id=room.id)
 
+                result_label = "success"
                 observe_booking_cancel(result="success", source="service", operation="cancel")
                 logger.info(
                     "booking_canceled",
                     extra={
                         "event": "booking_canceled",
+                        "operation": operation,
                         "booking_id": booking_id,
                         "timeslot_id": booking.timeslot_id,
                     },
                 )
             else:
                 # Cancel failed.
+                result_label = "failed"
                 observe_booking_cancel(result="failed", source="service", operation="cancel")
             return result
         finally:
-            dec_business_operation_in_progress("booking_cancel")
+            duration_seconds = perf_counter() - started_at
+            observe_business_operation_duration(
+                operation=operation,
+                result=result_label,
+                duration_seconds=duration_seconds,
+            )
+            if duration_seconds >= settings.OBS_SLOW_BUSINESS_OPERATION_SECONDS:
+                logger.warning(
+                    "business_operation_slow",
+                    extra={
+                        "event": "business_operation_slow",
+                        "operation": operation,
+                        "booking_id": booking_id,
+                        "duration_ms": round(duration_seconds * 1000, 3),
+                        "threshold_ms": round(settings.OBS_SLOW_BUSINESS_OPERATION_SECONDS * 1000, 3),
+                        "result": result_label,
+                        "anomaly_type": "slow_business_operation",
+                    },
+                )
+            dec_business_operation_in_progress(operation)

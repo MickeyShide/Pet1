@@ -1,9 +1,11 @@
 import uuid
 
 import anyio
+from starlette import status
 
 from app.config import settings
 from app.models.file import File, FileStatus
+from app.overload import OverloadRejected, overload_controller
 from app.repositories.file import FileRepository
 from app.schemas.image import SImageUploadIn
 from app.services.base import BaseService
@@ -20,13 +22,25 @@ class FileService(BaseService[File]):
         return f"images/{scope}/{owner_id}/{uid}.{ext}"
 
     async def presign_upload_put(self, bucket: str, key: str, content_type: str, expires: int) -> str:
-        return await anyio.to_thread.run_sync(
-            s3_utils.presign_put_object,
-            bucket,
-            key,
-            content_type,
-            expires,
-        )
+        try:
+            upload_url = await anyio.to_thread.run_sync(
+                s3_utils.presign_put_object,
+                bucket,
+                key,
+                content_type,
+                expires,
+            )
+            overload_controller.clear_dependency_degraded("minio")
+            return upload_url
+        except Exception as exc:
+            overload_controller.mark_dependency_degraded("minio", "presign_upload_failed")
+            raise OverloadRejected(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                error_code="dependency_degraded",
+                message="minio is degraded",
+                retry_after=settings.OVERLOAD_RETRY_AFTER_SECONDS,
+                degraded_component="minio",
+            ) from exc
 
     async def presign_download_get(self, bucket: str, key: str, expires: int) -> str:
         return await anyio.to_thread.run_sync(

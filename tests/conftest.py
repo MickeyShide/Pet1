@@ -38,6 +38,15 @@ def event_loop():
     loop.close()
 
 
+@pytest.fixture(autouse=True)
+def reset_overload_state():
+    from app.overload import overload_controller
+
+    overload_controller.reset()
+    yield
+    overload_controller.reset()
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _stop_dotenv_patch():
     yield

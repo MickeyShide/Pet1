@@ -7,6 +7,7 @@ from app.services.file import FileService
 from app.services.image import ImageService
 from app.services.location import LocationService
 from app.services.room import RoomService
+from app.overload import overload_protected
 
 
 class ImageBusinessService(BaseBusinessService):
@@ -15,6 +16,7 @@ class ImageBusinessService(BaseBusinessService):
     room_service: RoomService
     location_service: LocationService
 
+    @overload_protected("file_upload_room")
     @new_session()
     async def upload_room_image(self, room_id: int, payload: SImageUploadIn) -> SImagePresignOut:
         await self.room_service.get_one_by_id(room_id)
@@ -27,6 +29,7 @@ class ImageBusinessService(BaseBusinessService):
             payload=payload,
         )
 
+    @overload_protected("file_upload_location")
     @new_session()
     async def upload_location_image(self, location_id: int, payload: SImageUploadIn) -> SImagePresignOut:
         await self.location_service.get_one_by_id(location_id)
