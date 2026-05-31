@@ -92,7 +92,8 @@ services:
       dockerfile: docker/Dockerfile
     container_name: fastapi_pet1-backend-local
     env_file:
-      - ./telegram.env
+      - path: ./telegram.env
+        required: false
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://app:app@db/fastapi_pet_1}
       SECRET_KEY: ${SECRET_KEY:-abcdefg}
@@ -152,7 +153,8 @@ services:
       dockerfile: docker/Dockerfile
     container_name: fastapi_pet1-worker-local
     env_file:
-      - ./telegram.env
+      - path: ./telegram.env
+        required: false
     entrypoint:
       - python
       - -m
@@ -161,6 +163,7 @@ services:
       - app.celery_app.app:celery_app
       - worker
       - --loglevel=info
+      - --pool=solo
       - -Q
       - default
     environment:
@@ -191,6 +194,8 @@ services:
       SERVICE_NAME: ${WORKER_SERVICE_NAME:-pet1-worker}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FILE_PATH: ${WORKER_LOG_FILE_PATH:-/var/log/app/worker.log}
+      CELERY_METRICS_HOST: ${CELERY_METRICS_HOST:-0.0.0.0}
+      CELERY_METRICS_PORT: ${CELERY_METRICS_PORT:-9101}
 
     depends_on:
       db:
@@ -204,6 +209,8 @@ services:
     volumes:
       - ../:/var/www
       - backend-logs-local:/var/log/app
+    expose:
+      - "9101"
     stop_signal: SIGTERM
     stop_grace_period: 45s
     networks:
