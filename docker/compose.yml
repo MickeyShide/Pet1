@@ -216,96 +216,10 @@ services:
     networks:
       - local-net
 
-  loki:
-    image: grafana/loki:3.3.2
-    container_name: fastapi_pet1-loki-local
-    command: ["-config.file=/etc/loki/config.yml"]
-    ports:
-      - "3100:3100"
-    volumes:
-      - ./observability/loki/loki-config.yml:/etc/loki/config.yml:ro
-      - loki-data-local:/loki
-    networks:
-      - local-net
-
-  promtail:
-    image: grafana/promtail:3.3.2
-    container_name: fastapi_pet1-promtail-local
-    command: ["-config.file=/etc/promtail/config.yml"]
-    depends_on:
-      loki:
-        condition: service_started
-      backend:
-        condition: service_started
-      worker:
-        condition: service_started
-    volumes:
-      - ./observability/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
-      - backend-logs-local:/var/log/app:ro
-    networks:
-      - local-net
-
-  alertmanager:
-    image: prom/alertmanager:v0.28.1
-    container_name: fastapi_pet1-alertmanager-local
-    command:
-      - "--config.file=/etc/alertmanager/alertmanager.yml"
-      - "--storage.path=/alertmanager"
-    ports:
-      - "9093:9093"
-    volumes:
-      - ./observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
-      - alertmanager-data-local:/alertmanager
-    networks:
-      - local-net
-
-  prometheus:
-    image: prom/prometheus:v3.2.1
-    container_name: fastapi_pet1-prometheus-local
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--web.enable-lifecycle"
-    ports:
-      - "9090:9090"
-    depends_on:
-      backend:
-        condition: service_started
-      alertmanager:
-        condition: service_started
-      loki:
-        condition: service_started
-    volumes:
-      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./observability/prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro
-      - prometheus-data-local:/prometheus
-    networks:
-      - local-net
-
-  grafana:
-    image: grafana/grafana:11.5.2
-    container_name: fastapi_pet1-grafana-local
-    ports:
-      - "3000:3000"
-    depends_on:
-      prometheus:
-        condition: service_started
-      loki:
-        condition: service_started
-    environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
-      GF_METRICS_ENABLED: "true"
-    volumes:
-      - grafana-data-local:/var/lib/grafana
-      - ./observability/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
-      - ./observability/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    networks:
-      - local-net
-
 networks:
   local-net:
+    name: shide-observability
+    external: true
 
 volumes:
   db-data-local:
@@ -313,7 +227,3 @@ volumes:
   rabbitmq-data-local:
   minio-data-local:
   backend-logs-local:
-  prometheus-data-local:
-  loki-data-local:
-  grafana-data-local:
-  alertmanager-data-local:
